@@ -1,0 +1,22 @@
+# Render Blueprint Configuration
+# This file can be used to define infrastructure as code
+# See: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: recognito-knowledge-hub-backend
+    env: node
+    region: oregon  # Change to your preferred region
+    plan: free  # Change to 'starter' or 'standard' for production
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # Add your other environment variables here or in the dashboard
+      # JWT_SECRET, GOOGLE_API_KEY, etc.
+
+# Health check endpoint
+    healthCheckPath: /health
