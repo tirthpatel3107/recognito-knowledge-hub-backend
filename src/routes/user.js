@@ -149,19 +149,6 @@ router.post(
         return res.status(400).json({ error: 'Username cannot be empty' });
       }
 
-      // Validate photo size if provided (base64 images can be large)
-      if (photo !== undefined && photo !== null && photo !== '') {
-        // Check if it's a base64 data URL
-        if (photo.startsWith('data:')) {
-          // Google Sheets cell limit is ~50,000 characters
-          if (photo.length > 50000) {
-            return res.status(400).json({ 
-              error: 'Photo is too large. Please use a smaller image (max ~37KB base64)' 
-            });
-          }
-        }
-      }
-
       const success = await updateUserProfile(
         email,
         username !== undefined ? username.trim() : undefined,
