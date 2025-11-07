@@ -3,7 +3,7 @@
  */
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import { authenticateUser } from '../services/googleSheetsService.js';
+import { authenticateUser, updateUserPhotoFromGoogle } from '../services/googleSheetsService.js';
 import { setUserCredentials } from '../services/googleSheetsService.js';
 import { GOOGLE_CONFIG } from '../config/googleConfig.js';
 import { google } from 'googleapis';
@@ -67,6 +67,7 @@ router.post('/google/verify', async (req, res) => {
     const userInfo = await oauth2.userinfo.get();
 
     const googleEmail = userInfo.data.email;
+    const googlePhoto = userInfo.data.picture || '';
 
     // If expected email provided, verify it matches
     if (expectedEmail && googleEmail.toLowerCase() !== expectedEmail.toLowerCase()) {
@@ -80,9 +81,20 @@ router.post('/google/verify', async (req, res) => {
     // Set user credentials for subsequent API calls
     setUserCredentials(accessToken);
 
+    // Save Google account photo to Sheet1 if available
+    if (googlePhoto) {
+      try {
+        await updateUserPhotoFromGoogle(googleEmail, googlePhoto);
+      } catch (error) {
+        console.error('Error saving Google photo to sheet:', error);
+        // Don't fail authentication if photo save fails
+      }
+    }
+
     res.json({
       success: true,
       email: googleEmail,
+      picture: googlePhoto,
       message: 'Google authentication verified',
     });
   } catch (error) {

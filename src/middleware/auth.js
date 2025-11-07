@@ -5,6 +5,12 @@
 import jwt from 'jsonwebtoken';
 
 export const authenticateToken = (req, res, next) => {
+  // Check if JWT_SECRET is configured
+  if (!process.env.JWT_SECRET) {
+    console.error('JWT_SECRET is not configured');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -17,6 +23,7 @@ export const authenticateToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
+    console.error('Token verification failed:', error.message);
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 };

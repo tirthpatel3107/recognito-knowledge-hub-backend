@@ -33,7 +33,9 @@ app.use(cors({
   origin: FRONTEND_URL,
   credentials: true,
 }));
-app.use(express.json());
+// Increase body size limit to handle large base64 images (10MB limit)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Health check endpoint

@@ -48,13 +48,18 @@ Copy the output and paste it into `JWT_SECRET` in your `.env` file.
    - Google OAuth2 API
 4. Create credentials:
    - **API Key**: Go to "Credentials" > "Create Credentials" > "API Key"
-     - Restrict it to "Google Sheets API" and "Google Docs API" for security
+     - Under "API restrictions": Restrict to "Google Sheets API" and "Google Docs API"
+     - Under "Application restrictions": **IMPORTANT** - Set to "None" (for server-side usage)
+       - Server-side applications don't send HTTP referrers, so referrer-based restrictions will fail
+       - For production, consider using "IP addresses" restriction for better security
    - **OAuth 2.0 Client ID**: Go to "Credentials" > "Create Credentials" > "OAuth client ID"
      - Application type: Web application
      - Authorized redirect URIs: 
        - Local: `http://localhost:3001/api/auth/google/callback`
        - Production: `https://your-backend-url.onrender.com/api/auth/google/callback`
    - **Client Secret**: Generated when you create the OAuth 2.0 Client ID
+   
+   **Note**: If you get "Requests from referer <empty> are blocked" errors, see [AUTHENTICATION_FIX.md](./AUTHENTICATION_FIX.md) for troubleshooting.
 
 5. Fill in your `.env` file:
    ```

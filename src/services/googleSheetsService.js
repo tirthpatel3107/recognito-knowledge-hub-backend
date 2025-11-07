@@ -53,9 +53,25 @@ export const setUserCredentials = (accessToken) => {
 initializeGoogleSheets();
 
 // Authentication
-export const authenticateUser = async (email, password) => {
+export const authenticateUser = async (email, password, accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
+    // Use OAuth if access token is provided, otherwise try API key
+    let sheetsClient = sheets;
+    
+    if (accessToken) {
+      const tempOAuth2Client = new google.auth.OAuth2(
+        GOOGLE_CONFIG.CLIENT_ID,
+        GOOGLE_CONFIG.CLIENT_SECRET,
+        GOOGLE_CONFIG.REDIRECT_URI
+      );
+      tempOAuth2Client.setCredentials({ access_token: accessToken });
+      sheetsClient = google.sheets({
+        version: 'v4',
+        auth: tempOAuth2Client,
+      });
+    }
+
+    const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.LOGIN,
       range: 'Sheet1!A2:B100',
     });
@@ -75,6 +91,16 @@ export const authenticateUser = async (email, password) => {
     return false;
   } catch (error) {
     console.error('Authentication error:', error);
+    // Provide more helpful error message for API key issues
+    if (error.code === 403 && !accessToken) {
+      const helpfulError = new Error(
+        'API key access denied. Please check Google Cloud Console API key restrictions: ' +
+        'Application restrictions should be set to "None" or "IP addresses" for server-side usage. ' +
+        'Or make the spreadsheet publicly viewable.'
+      );
+      helpfulError.originalError = error;
+      throw helpfulError;
+    }
     throw error;
   }
 };
@@ -846,11 +872,68 @@ export const saveDashboardCardOrder = async (email, cardOrder) => {
 };
 
 // User mode functions
+// Helper function to ensure Mode sheet exists
+const ensureModeSheetExists = async (sheetsClient) => {
+  try {
+    // Try to get the spreadsheet to check if Mode sheet exists
+    const spreadsheet = await sheetsClient.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+    });
+
+    const sheetsList = spreadsheet.data.sheets || [];
+    const modeSheet = sheetsList.find(
+      (sheet) => sheet.properties.title === 'Mode'
+    );
+
+    if (!modeSheet) {
+      // Create the Mode sheet
+      await sheetsClient.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: 'Mode',
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      // Add headers to the new sheet
+      const headerValues = [['Email', 'Mode']];
+      await sheetsClient.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        range: 'Mode!A1:B1',
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: headerValues,
+        },
+      });
+
+      console.log('Mode sheet created successfully');
+    }
+  } catch (error) {
+    // If error is about sheet already existing, that's fine
+    if (error.message && error.message.includes('already exists')) {
+      console.log('Mode sheet already exists');
+    } else {
+      console.error('Error ensuring Mode sheet exists:', error);
+      throw error;
+    }
+  }
+};
+
 export const getUserMode = async (email) => {
   try {
+    // Ensure Mode sheet exists before trying to read from it
+    await ensureModeSheetExists(sheets);
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'Mode!A:B',
+      range: 'Mode!A2:B', // Start from row 2 to skip header
     });
 
     const rows = response.data.values || [];
@@ -870,9 +953,180 @@ export const getUserMode = async (email) => {
 
 export const updateUserMode = async (email, mode) => {
   try {
+    // Ensure Mode sheet exists before trying to write to it
+    await ensureModeSheetExists(sheets);
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'Mode!A:B',
+      range: 'Mode!A2:B', // Start from row 2 to skip header
+    });
+
+    const rows = response.data.values || [];
+    let rowIndex = -1;
+
+    // Search for existing user (skip header row, so rowIndex starts at 2)
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].length > 0 && rows[i][0].toLowerCase() === email.toLowerCase()) {
+        rowIndex = i + 2; // +2 because we start from row 2 (after header)
+        break;
+      }
+    }
+
+    const values = [[email, mode]];
+
+    if (rowIndex > 0) {
+      // Update existing row
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        range: `Mode!A${rowIndex}:B${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: values,
+        },
+      });
+      console.log(`Updated mode for ${email} at row ${rowIndex}`);
+    } else {
+      // Append new row (will be added after existing data)
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        range: 'Mode!A2:B', // Start from row 2 to skip header
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: values,
+        },
+      });
+      console.log(`Appended new mode for ${email}`);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating user mode:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data
+    });
+    throw error;
+  }
+};
+
+// Color palette functions
+// ColorPalette sheet structure: A:Email, B:LightModeColor, C:DarkModeColor
+// Colors are stored as HSL string: "hue saturation% lightness%"
+
+// Helper function to ensure ColorPalette sheet exists
+const ensureColorPaletteSheetExists = async (sheetsClient) => {
+  try {
+    // Try to get the spreadsheet to check if ColorPalette sheet exists
+    const spreadsheet = await sheetsClient.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+    });
+
+    const sheetsList = spreadsheet.data.sheets || [];
+    const colorPaletteSheet = sheetsList.find(
+      (sheet) => sheet.properties.title === 'ColorPalette'
+    );
+
+    if (!colorPaletteSheet) {
+      // Create the ColorPalette sheet
+      await sheetsClient.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: 'ColorPalette',
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      // Add headers to the new sheet
+      const headerValues = [['Email', 'LightModeColor', 'DarkModeColor']];
+      await sheetsClient.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        range: 'ColorPalette!A1:C1',
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: headerValues,
+        },
+      });
+
+      console.log('ColorPalette sheet created successfully');
+    }
+  } catch (error) {
+    // If error is about sheet already existing, that's fine
+    if (error.message && error.message.includes('already exists')) {
+      console.log('ColorPalette sheet already exists');
+    } else {
+      console.error('Error ensuring ColorPalette sheet exists:', error);
+      throw error;
+    }
+  }
+};
+
+export const getUserColorPalette = async (email) => {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      range: 'ColorPalette!A:C',
+    });
+
+    const rows = response.data.values || [];
+
+    for (const row of rows) {
+      if (row.length >= 1 && row[0].toLowerCase() === email.toLowerCase()) {
+        // Convert empty strings to null for consistency
+        const lightColor = row[1] && row[1].trim() !== '' ? row[1] : null;
+        const darkColor = row[2] && row[2].trim() !== '' ? row[2] : null;
+        return {
+          lightModeColor: lightColor,
+          darkModeColor: darkColor,
+        };
+      }
+    }
+
+    return { lightModeColor: null, darkModeColor: null };
+  } catch (error) {
+    // If sheet doesn't exist, return default values
+    if (error.code === 400 && error.message && error.message.includes('Unable to parse range')) {
+      console.log('ColorPalette sheet does not exist yet, returning default values');
+      return { lightModeColor: null, darkModeColor: null };
+    }
+    console.error('Error fetching user color palette:', error);
+    throw error;
+  }
+};
+
+export const updateUserColorPalette = async (email, lightModeColor, darkModeColor, accessToken = null) => {
+  try {
+    // Use OAuth if access token is provided, otherwise use API key (read-only)
+    let sheetsClient = sheets;
+    
+    if (accessToken) {
+      const tempOAuth2Client = new google.auth.OAuth2(
+        GOOGLE_CONFIG.CLIENT_ID,
+        GOOGLE_CONFIG.CLIENT_SECRET,
+        GOOGLE_CONFIG.REDIRECT_URI
+      );
+      tempOAuth2Client.setCredentials({ access_token: accessToken });
+      sheetsClient = google.sheets({
+        version: 'v4',
+        auth: tempOAuth2Client,
+      });
+    } else {
+      throw new Error('Access token is required to update color palette');
+    }
+
+    // Ensure sheet exists before reading/writing
+    await ensureColorPaletteSheetExists(sheetsClient);
+
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      range: 'ColorPalette!A:C',
     });
 
     const rows = response.data.values || [];
@@ -885,21 +1139,27 @@ export const updateUserMode = async (email, mode) => {
       }
     }
 
-    const values = [[email, mode]];
+    // Convert null to empty string for Google Sheets (empty string means default/not set)
+    const lightColorValue = lightModeColor === null || lightModeColor === undefined ? '' : lightModeColor;
+    const darkColorValue = darkModeColor === null || darkModeColor === undefined ? '' : darkModeColor;
+    
+    const values = [[email, lightColorValue, darkColorValue]];
 
     if (rowIndex > 0) {
-      await sheets.spreadsheets.values.update({
+      // Update existing row
+      await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_IDS.LOGIN,
-        range: `Mode!A${rowIndex}:B${rowIndex}`,
+        range: `ColorPalette!A${rowIndex}:C${rowIndex}`,
         valueInputOption: 'RAW',
         requestBody: {
           values: values,
         },
       });
     } else {
-      await sheets.spreadsheets.values.append({
+      // Append new row
+      await sheetsClient.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_IDS.LOGIN,
-        range: 'Mode!A:B',
+        range: 'ColorPalette!A:C',
         valueInputOption: 'RAW',
         requestBody: {
           values: values,
@@ -909,7 +1169,201 @@ export const updateUserMode = async (email, mode) => {
 
     return true;
   } catch (error) {
-    console.error('Error updating user mode:', error);
+    console.error('Error updating user color palette:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data
+    });
+    throw error;
+  }
+};
+
+// User profile functions
+// Sheet1 structure: A:Email, B:Password, C:Username, D:Photo
+export const getUserProfile = async (email) => {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      range: 'Sheet1!A2:D100',
+    });
+
+    const rows = response.data.values || [];
+
+    for (const row of rows) {
+      if (row.length >= 2 && row[0].toLowerCase() === email.toLowerCase()) {
+        return {
+          email: row[0] || '',
+          password: row[1] || '',
+          username: row[2] || 'NA', // Default to 'NA' if username not set
+          photo: row[3] || '', // Photo as base64 or URL
+        };
+      }
+    }
+
+    // Return default if user not found
+    return {
+      email: email,
+      password: '',
+      username: 'NA',
+      photo: '',
+    };
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    throw error;
+  }
+};
+
+export const updateUserProfile = async (email, username, photo = null) => {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      range: 'Sheet1!A2:D100',
+    });
+
+    const rows = response.data.values || [];
+    let rowIndex = -1;
+
+    // Find the row for the current user's email
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].length > 0 && rows[i][0].toLowerCase() === email.toLowerCase()) {
+        rowIndex = i + 2; // +2 because sheets are 1-indexed and we start from row 2
+        break;
+      }
+    }
+
+    if (rowIndex > 0) {
+      // Update username (column C) and photo (column D) if provided
+      // Use individual updates for better reliability, especially with large base64 images
+      
+      if (username !== undefined) {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_IDS.LOGIN,
+          range: `Sheet1!C${rowIndex}`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [[username || 'NA']],
+          },
+        });
+      }
+      
+      if (photo !== null && photo !== undefined) {
+        // For base64 images, truncate if too long (Google Sheets cell limit is ~50,000 characters)
+        // But we'll try to save it as-is first
+        const photoValue = photo || '';
+        
+        // Check if photo is a base64 data URL and if it's too large
+        if (photoValue.startsWith('data:') && photoValue.length > 50000) {
+          console.warn('Photo is very large, attempting to save anyway');
+        }
+        
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_IDS.LOGIN,
+          range: `Sheet1!D${rowIndex}`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [[photoValue]],
+          },
+        });
+      }
+    } else {
+      // User not found, but we won't create a new row here
+      // This should only be called for authenticated users
+      throw new Error('User not found');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    throw error;
+  }
+};
+
+// Update user photo from Google account during authentication
+export const updateUserPhotoFromGoogle = async (email, photoUrl) => {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      range: 'Sheet1!A2:D100',
+    });
+
+    const rows = response.data.values || [];
+    let rowIndex = -1;
+
+    // Find the row for the current user's email
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].length > 0 && rows[i][0].toLowerCase() === email.toLowerCase()) {
+        rowIndex = i + 2;
+        break;
+      }
+    }
+
+    if (rowIndex > 0) {
+      // Only update if photo column is empty (don't overwrite user's uploaded photo)
+      const currentPhoto = rows[rowIndex - 2][3] || '';
+      if (!currentPhoto || currentPhoto.trim() === '') {
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_IDS.LOGIN,
+          range: `Sheet1!D${rowIndex}`,
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [[photoUrl || '']],
+          },
+        });
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating user photo from Google:', error);
+    throw error;
+  }
+};
+
+// Update user password
+// Sheet1 structure: A:Email, B:Password, C:Username, D:Photo
+export const updateUserPassword = async (email, currentPassword, newPassword) => {
+  try {
+    // First verify the current password
+    const isValid = await authenticateUser(email, currentPassword);
+    if (!isValid) {
+      throw new Error('Current password is incorrect');
+    }
+
+    // Get the spreadsheet to find the user's row
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      range: 'Sheet1!A2:D100',
+    });
+
+    const rows = response.data.values || [];
+    let rowIndex = -1;
+
+    // Find the row for the current user's email
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].length > 0 && rows[i][0].toLowerCase() === email.toLowerCase()) {
+        rowIndex = i + 2; // +2 because sheets are 1-indexed and we start from row 2
+        break;
+      }
+    }
+
+    if (rowIndex > 0) {
+      // Update password in column B
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        range: `Sheet1!B${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [[newPassword]],
+        },
+      });
+    } else {
+      throw new Error('User not found');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating user password:', error);
     throw error;
   }
 };
