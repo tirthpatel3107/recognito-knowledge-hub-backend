@@ -11,19 +11,34 @@ import {
   setUserCredentials,
 } from '../services/googleSheetsService.js';
 import { authenticateToken, authenticateGoogleToken } from '../middleware/auth.js';
-import { SPREADSHEET_IDS } from '../config/googleConfig.js';
+import { GOOGLE_CONFIG, SPREADSHEET_IDS } from '../config/googleConfig.js';
 import { google } from 'googleapis';
 
 const router = express.Router();
 
-// Helper to get sheet ID for "Project List" sheet
-const getProjectListSheetId = async () => {
-  const sheets = google.sheets({
-    version: 'v4',
-    auth: process.env.GOOGLE_API_KEY,
-  });
+const buildSheetsClient = (accessToken = null) => {
+  if (accessToken) {
+    const oauth2Client = new google.auth.OAuth2(
+      GOOGLE_CONFIG.CLIENT_ID,
+      GOOGLE_CONFIG.CLIENT_SECRET,
+      GOOGLE_CONFIG.REDIRECT_URI
+    );
+    oauth2Client.setCredentials({ access_token: accessToken });
+    return google.sheets({ version: 'v4', auth: oauth2Client });
+  }
 
-  const response = await sheets.spreadsheets.get({
+  if (!GOOGLE_CONFIG.API_KEY) {
+    throw new Error('Google API key is not configured for read-only access');
+  }
+
+  return google.sheets({ version: 'v4', auth: GOOGLE_CONFIG.API_KEY });
+};
+
+// Helper to get sheet ID for "Project List" sheet
+const getProjectListSheetId = async (accessToken = null) => {
+  const sheetsClient = buildSheetsClient(accessToken);
+
+  const response = await sheetsClient.spreadsheets.get({
     spreadsheetId: SPREADSHEET_IDS.PROJECT_LISTING,
   });
 
@@ -35,10 +50,12 @@ const getProjectListSheetId = async () => {
   return projectListSheet?.properties.sheetId;
 };
 
-// Get all projects (read-only)
+// Get all projects (read-only, but supports OAuth if available)
 router.get('/', async (req, res) => {
   try {
-    const projects = await getProjects();
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || (req.user?.email ? getGoogleToken(req.user.email) : null);
+    const projects = await getProjects(googleToken);
     res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
@@ -120,7 +137,7 @@ router.delete(
       setUserCredentials(req.googleToken);
       const { rowIndex } = req.params;
 
-      const sheetId = await getProjectListSheetId();
+      const sheetId = await getProjectListSheetId(req.googleToken);
 
       if (!sheetId) {
         return res.status(404).json({ error: 'Project List sheet not found' });
@@ -161,7 +178,7 @@ router.post(
           .json({ error: 'oldIndex and newIndex are required numbers' });
       }
 
-      const sheetId = await getProjectListSheetId();
+      const sheetId = await getProjectListSheetId(req.googleToken);
 
       if (!sheetId) {
         return res.status(404).json({ error: 'Project List sheet not found' });

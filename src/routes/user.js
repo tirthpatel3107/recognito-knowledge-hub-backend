@@ -15,14 +15,20 @@ import {
   updateUserColorPalette,
 } from '../services/googleSheetsService.js';
 import { authenticateToken, authenticateGoogleToken } from '../middleware/auth.js';
+import { getServiceConfigValue } from '../config/googleConfig.js';
+import { getGoogleToken } from '../services/googleTokenStore.js';
 
 const router = express.Router();
+
+const isDevelopment = () => (getServiceConfigValue('NODE_ENV') || 'development') === 'development';
 
 // Get dashboard card order
 router.get('/dashboard-order', authenticateToken, async (req, res) => {
   try {
     const email = req.user.email;
-    const cardOrder = await getDashboardCardOrder(email);
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || getGoogleToken(email);
+    const cardOrder = await getDashboardCardOrder(email, googleToken);
     res.json(cardOrder);
   } catch (error) {
     console.error('Error fetching dashboard card order:', error);
@@ -65,7 +71,9 @@ router.post(
 router.get('/mode', authenticateToken, async (req, res) => {
   try {
     const email = req.user.email;
-    const mode = await getUserMode(email);
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || getGoogleToken(email);
+    const mode = await getUserMode(email, googleToken);
     res.json({ mode: mode || 'Light' });
   } catch (error) {
     console.error('Error fetching user mode:', error);
@@ -114,18 +122,20 @@ router.post(
       console.error('Error stack:', error.stack);
       res.status(500).json({ 
         error: 'Failed to update user mode',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: isDevelopment() ? error.message : undefined,
+        stack: isDevelopment() ? error.stack : undefined
       });
     }
   }
 );
 
-// Get user profile (username and email from Sheet1)
+// Get user profile (username and email from UserDetail sheet)
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const email = req.user.email;
-    const profile = await getUserProfile(email);
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || getGoogleToken(email);
+    const profile = await getUserProfile(email, googleToken);
     res.json(profile);
   } catch (error) {
     console.error('Error fetching user profile:', error);
@@ -133,7 +143,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Update user profile (username and photo in Sheet1)
+// Update user profile (username and photo in UserDetail sheet)
 router.post(
   '/profile',
   authenticateToken,
@@ -169,7 +179,7 @@ router.post(
       const errorMessage = error.message || 'Failed to update user profile';
       res.status(500).json({ 
         error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: isDevelopment() ? error.stack : undefined
       });
     }
   }
@@ -216,7 +226,7 @@ router.post(
       const statusCode = error.message === 'Current password is incorrect' ? 401 : 500;
       res.status(statusCode).json({ 
         error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: isDevelopment() ? error.stack : undefined
       });
     }
   }
@@ -226,7 +236,9 @@ router.post(
 router.get('/color-palette', authenticateToken, async (req, res) => {
   try {
     const email = req.user.email;
-    const palette = await getUserColorPalette(email);
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || getGoogleToken(email);
+    const palette = await getUserColorPalette(email, googleToken);
     res.json(palette);
   } catch (error) {
     console.error('Error fetching user color palette:', error);
@@ -275,12 +287,12 @@ router.post(
         message: error.message,
         code: error.code,
         response: error.response?.data,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        stack: isDevelopment() ? error.stack : undefined
       });
       const errorMessage = error.message || 'Failed to update user color palette';
       res.status(500).json({ 
         error: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? error.response?.data : undefined
+        details: isDevelopment() ? error.response?.data : undefined
       });
     }
   }

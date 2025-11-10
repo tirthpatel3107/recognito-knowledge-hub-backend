@@ -13,19 +13,34 @@ import {
   setUserCredentials,
 } from '../services/googleSheetsService.js';
 import { authenticateToken, authenticateGoogleToken } from '../middleware/auth.js';
-import { SPREADSHEET_IDS } from '../config/googleConfig.js';
+import { GOOGLE_CONFIG, SPREADSHEET_IDS } from '../config/googleConfig.js';
 import { google } from 'googleapis';
 
 const router = express.Router();
 
-// Helper to get sheet ID by name
-const getSheetIdByName = async (sheetName) => {
-  const sheets = google.sheets({
-    version: 'v4',
-    auth: process.env.GOOGLE_API_KEY,
-  });
+const buildSheetsClient = (accessToken = null) => {
+  if (accessToken) {
+    const oauth2Client = new google.auth.OAuth2(
+      GOOGLE_CONFIG.CLIENT_ID,
+      GOOGLE_CONFIG.CLIENT_SECRET,
+      GOOGLE_CONFIG.REDIRECT_URI
+    );
+    oauth2Client.setCredentials({ access_token: accessToken });
+    return google.sheets({ version: 'v4', auth: oauth2Client });
+  }
 
-  const response = await sheets.spreadsheets.get({
+  if (!GOOGLE_CONFIG.API_KEY) {
+    throw new Error('Google API key is not configured for read-only access');
+  }
+
+  return google.sheets({ version: 'v4', auth: GOOGLE_CONFIG.API_KEY });
+};
+
+// Helper to get sheet ID by name
+const getSheetIdByName = async (sheetName, accessToken = null) => {
+  const sheetsClient = buildSheetsClient(accessToken);
+
+  const response = await sheetsClient.spreadsheets.get({
     spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
   });
 
@@ -37,10 +52,12 @@ const getSheetIdByName = async (sheetName) => {
   return targetSheet?.properties.sheetId;
 };
 
-// Get all month sheets
+// Get all month sheets (read-only, but supports OAuth if available)
 router.get('/months', async (req, res) => {
   try {
-    const monthSheets = await getWorkSummaryMonthSheets();
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || (req.user?.email ? getGoogleToken(req.user.email) : null);
+    const monthSheets = await getWorkSummaryMonthSheets(googleToken);
     res.json(monthSheets);
   } catch (error) {
     console.error('Error fetching month sheets:', error);
@@ -48,11 +65,13 @@ router.get('/months', async (req, res) => {
   }
 });
 
-// Get work summary entries for a month
+// Get work summary entries for a month (read-only, but supports OAuth if available)
 router.get('/entries/:monthSheet', async (req, res) => {
   try {
     const { monthSheet } = req.params;
-    const entries = await getWorkSummaryEntriesByMonth(monthSheet);
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || (req.user?.email ? getGoogleToken(req.user.email) : null);
+    const entries = await getWorkSummaryEntriesByMonth(monthSheet, googleToken);
     res.json(entries);
   } catch (error) {
     console.error('Error fetching work summary entries:', error);
@@ -104,15 +123,13 @@ router.post(
         });
       }
 
-      // Determine month sheet from date if not provided
       const targetMonthSheet = monthSheet || getMonthNameFromDate(date);
 
       if (!targetMonthSheet) {
         return res.status(400).json({ error: 'Invalid date format' });
       }
 
-      // Check if month sheet exists, create if it doesn't
-      const existingSheets = await getWorkSummaryMonthSheets();
+      const existingSheets = await getWorkSummaryMonthSheets(req.googleToken);
       if (!existingSheets.includes(targetMonthSheet)) {
         await createWorkSummaryMonthSheet(targetMonthSheet);
       }
@@ -158,15 +175,13 @@ router.put(
       const newMonth = getMonthNameFromDate(date);
       const oldMonth = oldDate ? getMonthNameFromDate(oldDate) : monthSheet;
 
-      // If month changed, delete from old sheet and add to new sheet
       if (oldDate && oldMonth !== newMonth && newMonth) {
-        const sheetId = await getSheetIdByName(monthSheet);
+        const sheetId = await getSheetIdByName(monthSheet, req.googleToken);
         if (sheetId) {
           await deleteWorkSummaryEntry(monthSheet, parseInt(rowIndex), sheetId);
         }
 
-        // Ensure new month sheet exists
-        const existingSheets = await getWorkSummaryMonthSheets();
+        const existingSheets = await getWorkSummaryMonthSheets(req.googleToken);
         if (!existingSheets.includes(newMonth)) {
           await createWorkSummaryMonthSheet(newMonth);
         }
@@ -186,7 +201,6 @@ router.put(
           res.status(500).json({ error: 'Failed to update work summary entry' });
         }
       } else {
-        // Update in same sheet
         const success = await updateWorkSummaryEntry(
           monthSheet,
           parseInt(rowIndex),
@@ -219,7 +233,7 @@ router.delete(
       setUserCredentials(req.googleToken);
       const { monthSheet, rowIndex } = req.params;
 
-      const sheetId = await getSheetIdByName(monthSheet);
+      const sheetId = await getSheetIdByName(monthSheet, req.googleToken);
 
       if (!sheetId) {
         return res.status(404).json({ error: 'Month sheet not found' });

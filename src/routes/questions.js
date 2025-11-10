@@ -12,14 +12,17 @@ import {
   setUserCredentials,
 } from '../services/googleSheetsService.js';
 import { authenticateToken, authenticateGoogleToken } from '../middleware/auth.js';
+import { getGoogleToken } from '../services/googleTokenStore.js';
 
 const router = express.Router();
 
-// Get questions for a technology (read-only)
+// Get questions for a technology (read-only, but supports OAuth if available)
 router.get('/:technologyName', async (req, res) => {
   try {
     const { technologyName } = req.params;
-    const questions = await getQuestions(technologyName);
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || (req.user?.email ? getGoogleToken(req.user.email) : null);
+    const questions = await getQuestions(technologyName, googleToken);
     res.json(questions);
   } catch (error) {
     console.error('Error fetching questions:', error);
@@ -108,7 +111,7 @@ router.delete(
       const { technologyName, rowIndex } = req.params;
 
       // Get sheet ID for the technology
-      const technologies = await getTechnologies();
+      const technologies = await getTechnologies(req.googleToken);
       const tech = technologies.find((t) => t.name === technologyName);
 
       if (!tech || tech.sheetId === undefined) {
@@ -156,7 +159,7 @@ router.post(
       }
 
       // Get sheet ID for the technology
-      const technologies = await getTechnologies();
+      const technologies = await getTechnologies(req.googleToken);
       const tech = technologies.find((t) => t.name === technologyName);
 
       if (!tech || tech.sheetId === undefined) {

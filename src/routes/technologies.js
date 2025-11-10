@@ -11,13 +11,16 @@ import {
   setUserCredentials,
 } from '../services/googleSheetsService.js';
 import { authenticateToken, authenticateGoogleToken } from '../middleware/auth.js';
+import { getGoogleToken } from '../services/googleTokenStore.js';
 
 const router = express.Router();
 
-// Get all technologies (read-only, no auth needed)
+// Get all technologies (read-only, no auth needed, but supports OAuth if available)
 router.get('/', async (req, res) => {
   try {
-    const technologies = await getTechnologies();
+    // Try to get Google OAuth token for authenticated access to private sheets
+    const googleToken = req.headers['x-google-token'] || (req.user?.email ? getGoogleToken(req.user.email) : null);
+    const technologies = await getTechnologies(googleToken);
     res.json(technologies);
   } catch (error) {
     console.error('Error fetching technologies:', error);

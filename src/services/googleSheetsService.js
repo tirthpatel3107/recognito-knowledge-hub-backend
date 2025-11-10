@@ -8,6 +8,12 @@ import {
   SPREADSHEET_IDS,
 } from '../config/googleConfig.js';
 
+// Helper function to get LOGIN spreadsheet ID
+// Always check process.env first (set in .env file), then fall back to config
+const getLoginSpreadsheetId = () => {
+  return process.env.LOGIN_SPREADSHEET_ID || SPREADSHEET_IDS.LOGIN || '';
+};
+
 // Initialize Google Sheets API
 let sheets;
 let oauth2Client;
@@ -52,31 +58,119 @@ export const setUserCredentials = (accessToken) => {
 // Initialize on module load
 initializeGoogleSheets();
 
+// Helper function to fetch from Google Sheets with OAuth support
+const fetchFromSheets = async (spreadsheetId, range, accessToken = null) => {
+  if (accessToken) {
+    // Use fetch API directly with the access token (OAuth authentication)
+    const encodedRange = encodeURIComponent(range);
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodedRange}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch from sheet: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } else {
+    // Fall back to googleapis library with API key (may fail for private sheets)
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
+    });
+    return response.data;
+  }
+};
+
+// Helper function to get spreadsheet metadata with OAuth support
+const getSpreadsheetMetadata = async (spreadsheetId, accessToken = null) => {
+  if (accessToken) {
+    // Use fetch API directly with the access token (OAuth authentication)
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to fetch spreadsheet metadata: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } else {
+    // Fall back to googleapis library with API key (may fail for private sheets)
+    const response = await sheets.spreadsheets.get({
+      spreadsheetId,
+    });
+    return response.data;
+  }
+};
+
 // Authentication
 export const authenticateUser = async (email, password, accessToken = null) => {
   try {
-    // Use OAuth if access token is provided, otherwise try API key
-    let sheetsClient = sheets;
+    // Get Login spreadsheet ID (from .env file)
+    const loginSpreadsheetId = getLoginSpreadsheetId();
     
-    if (accessToken) {
-      const tempOAuth2Client = new google.auth.OAuth2(
-        GOOGLE_CONFIG.CLIENT_ID,
-        GOOGLE_CONFIG.CLIENT_SECRET,
-        GOOGLE_CONFIG.REDIRECT_URI
-      );
-      tempOAuth2Client.setCredentials({ access_token: accessToken });
-      sheetsClient = google.sheets({
-        version: 'v4',
-        auth: tempOAuth2Client,
-      });
+    if (!loginSpreadsheetId || loginSpreadsheetId.trim() === '') {
+      const errorMsg = 'LOGIN_SPREADSHEET_ID is not configured. ' +
+        'Please ensure the .env file exists in the backend root directory with LOGIN_SPREADSHEET_ID set, ' +
+        'and restart the server completely.';
+      console.error('[authenticateUser] ERROR:', errorMsg);
+      throw new Error(errorMsg);
     }
 
-    const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'Sheet1!A2:B100',
-    });
+    // Use fetch API if access token is provided (doesn't require CLIENT_ID/CLIENT_SECRET)
+    // Otherwise use the googleapis library with API key
+    let rows = [];
+    
+    // Use "UserDetail" sheet name (renamed from "Sheet1")
+    const sheetRange = 'UserDetail!A2:B100';
+    console.log(`[authenticateUser] Using sheet range: ${sheetRange}`);
+    
+    if (accessToken) {
+      // Use fetch API directly with the access token
+      const range = encodeURIComponent(sheetRange);
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${loginSpreadsheetId}/values/${range}`;
+      console.log(`[authenticateUser] Fetching from URL: ${url.replace(loginSpreadsheetId, 'SPREADSHEET_ID')}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-    const rows = response.data.values || [];
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[authenticateUser] Google Sheets API error:', errorText);
+        console.error(`[authenticateUser] Requested range: ${sheetRange}`);
+        console.error(`[authenticateUser] Spreadsheet ID: ${loginSpreadsheetId.substring(0, 20)}...`);
+        throw new Error(`Failed to fetch login data: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      rows = data.values || [];
+      console.log(`[authenticateUser] Successfully fetched ${rows.length} rows from ${sheetRange}`);
+    } else {
+      // Use googleapis library with API key (for read-only access)
+      console.log(`[authenticateUser] Using googleapis library with range: ${sheetRange}`);
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: loginSpreadsheetId,
+        range: sheetRange,
+      });
+      rows = response.data.values || [];
+      console.log(`[authenticateUser] Successfully fetched ${rows.length} rows from ${sheetRange}`);
+    }
 
     for (const row of rows) {
       if (
@@ -106,13 +200,10 @@ export const authenticateUser = async (email, password, accessToken = null) => {
 };
 
 // Get all technologies (sheets)
-export const getTechnologies = async () => {
+export const getTechnologies = async (accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
-    });
-
-    const sheetList = response.data.sheets || [];
+    const data = await getSpreadsheetMetadata(SPREADSHEET_IDS.QUESTION_BANK, accessToken);
+    const sheetList = data.sheets || [];
 
     // Filter out the first sheet (credentials)
     return sheetList.slice(1).map((sheet, index) => ({
@@ -243,14 +334,15 @@ export const reorderTechnologies = async (technologyIds) => {
 };
 
 // Get questions for a technology
-export const getQuestions = async (technologyName) => {
+export const getQuestions = async (technologyName, accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
-      range: `${technologyName}!A2:D1000`,
-    });
+    const data = await fetchFromSheets(
+      SPREADSHEET_IDS.QUESTION_BANK,
+      `${technologyName}!A2:D1000`,
+      accessToken
+    );
 
-    const rows = response.data.values || [];
+    const rows = data.values || [];
 
     return rows.map((row, index) => {
       const imageUrls = row[3] ? row[3].split('||').filter(Boolean) : undefined;
@@ -426,14 +518,15 @@ export const reorderQuestions = async (
 };
 
 // Get practical tasks
-export const getPracticalTasks = async () => {
+export const getPracticalTasks = async (accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
-      range: 'Sheet1!A2:E1000',
-    });
+    const data = await fetchFromSheets(
+      SPREADSHEET_IDS.PRACTICAL_TASKS,
+      'Sheet1!A2:E1000',
+      accessToken
+    );
 
-    const rows = response.data.values || [];
+    const rows = data.values || [];
 
     return rows.map((row, index) => ({
       id: (index + 1).toString(),
@@ -451,14 +544,15 @@ export const getPracticalTasks = async () => {
 // Project Management Functions
 
 // Get all projects
-export const getProjects = async () => {
+export const getProjects = async (accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.PROJECT_LISTING,
-      range: 'Project List!A2:C1000',
-    });
+    const data = await fetchFromSheets(
+      SPREADSHEET_IDS.PROJECT_LISTING,
+      'Project List!A2:C1000',
+      accessToken
+    );
 
-    const rows = response.data.values || [];
+    const rows = data.values || [];
 
     return rows.map((row, index) => ({
       id: (index + 1).toString(),
@@ -603,13 +697,10 @@ export const reorderProjects = async (oldIndex, newIndex, sheetId) => {
 // Work Summary Functions
 
 // Get all month sheets
-export const getWorkSummaryMonthSheets = async () => {
+export const getWorkSummaryMonthSheets = async (accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
-    });
-
-    const sheetsList = response.data.sheets || [];
+    const data = await getSpreadsheetMetadata(SPREADSHEET_IDS.WORK_SUMMARY, accessToken);
+    const sheetsList = data.sheets || [];
     return sheetsList
       .map((sheet) => sheet.properties.title)
       .filter((title) => title !== 'Sheet1' && title !== 'Project List');
@@ -620,14 +711,15 @@ export const getWorkSummaryMonthSheets = async () => {
 };
 
 // Get work summary entries by month
-export const getWorkSummaryEntriesByMonth = async (monthSheet) => {
+export const getWorkSummaryEntriesByMonth = async (monthSheet, accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
-      range: `${monthSheet}!A2:E1000`,
-    });
+    const data = await fetchFromSheets(
+      SPREADSHEET_IDS.WORK_SUMMARY,
+      `${monthSheet}!A2:E1000`,
+      accessToken
+    );
 
-    const rows = response.data.values || [];
+    const rows = data.values || [];
 
     return rows.map((row, index) => ({
       id: (index + 1).toString(),
@@ -803,14 +895,20 @@ export const getMonthNameFromDate = (dateString) => {
 };
 
 // Dashboard card order functions
-export const getDashboardCardOrder = async (email) => {
+export const getDashboardCardOrder = async (email, accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'DashboardOrder!A:Z',
-    });
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
+    const data = await fetchFromSheets(
+      loginSpreadsheetId,
+      'DashboardOrder!A:Z',
+      accessToken
+    );
 
-    const rows = response.data.values || [];
+    const rows = data.values || [];
 
     for (const row of rows) {
       if (row.length > 0 && row[0].toLowerCase() === email.toLowerCase()) {
@@ -827,8 +925,13 @@ export const getDashboardCardOrder = async (email) => {
 
 export const saveDashboardCardOrder = async (email, cardOrder) => {
   try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      spreadsheetId: loginSpreadsheetId,
       range: 'DashboardOrder!A:Z',
     });
 
@@ -846,7 +949,7 @@ export const saveDashboardCardOrder = async (email, cardOrder) => {
 
     if (rowIndex > 0) {
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         range: `DashboardOrder!A${rowIndex}:Z${rowIndex}`,
         valueInputOption: 'RAW',
         requestBody: {
@@ -855,7 +958,7 @@ export const saveDashboardCardOrder = async (email, cardOrder) => {
       });
     } else {
       await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         range: 'DashboardOrder!A:Z',
         valueInputOption: 'RAW',
         requestBody: {
@@ -875,9 +978,14 @@ export const saveDashboardCardOrder = async (email, cardOrder) => {
 // Helper function to ensure Mode sheet exists
 const ensureModeSheetExists = async (sheetsClient) => {
   try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
     // Try to get the spreadsheet to check if Mode sheet exists
     const spreadsheet = await sheetsClient.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      spreadsheetId: loginSpreadsheetId,
     });
 
     const sheetsList = spreadsheet.data.sheets || [];
@@ -888,7 +996,7 @@ const ensureModeSheetExists = async (sheetsClient) => {
     if (!modeSheet) {
       // Create the Mode sheet
       await sheetsClient.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         requestBody: {
           requests: [
             {
@@ -905,7 +1013,7 @@ const ensureModeSheetExists = async (sheetsClient) => {
       // Add headers to the new sheet
       const headerValues = [['Email', 'Mode']];
       await sheetsClient.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         range: 'Mode!A1:B1',
         valueInputOption: 'RAW',
         requestBody: {
@@ -926,17 +1034,38 @@ const ensureModeSheetExists = async (sheetsClient) => {
   }
 };
 
-export const getUserMode = async (email) => {
+export const getUserMode = async (email, accessToken = null) => {
   try {
-    // Ensure Mode sheet exists before trying to read from it
-    await ensureModeSheetExists(sheets);
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
     
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'Mode!A2:B', // Start from row 2 to skip header
-    });
+    // Ensure Mode sheet exists before trying to read from it
+    // Note: ensureModeSheetExists uses the sheets client, which may need OAuth
+    // For now, we'll try to read first and handle errors
+    let data;
+    try {
+      data = await fetchFromSheets(
+        loginSpreadsheetId,
+        'Mode!A2:B',
+        accessToken
+      );
+    } catch (error) {
+      // If sheet doesn't exist, try to create it (requires OAuth)
+      if (accessToken) {
+        await ensureModeSheetExists(sheets);
+        data = await fetchFromSheets(
+          loginSpreadsheetId,
+          'Mode!A2:B',
+          accessToken
+        );
+      } else {
+        throw error;
+      }
+    }
 
-    const rows = response.data.values || [];
+    const rows = data.values || [];
 
     for (const row of rows) {
       if (row.length >= 2 && row[0].toLowerCase() === email.toLowerCase()) {
@@ -953,11 +1082,16 @@ export const getUserMode = async (email) => {
 
 export const updateUserMode = async (email, mode) => {
   try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
     // Ensure Mode sheet exists before trying to write to it
     await ensureModeSheetExists(sheets);
     
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      spreadsheetId: loginSpreadsheetId,
       range: 'Mode!A2:B', // Start from row 2 to skip header
     });
 
@@ -977,7 +1111,7 @@ export const updateUserMode = async (email, mode) => {
     if (rowIndex > 0) {
       // Update existing row
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         range: `Mode!A${rowIndex}:B${rowIndex}`,
         valueInputOption: 'RAW',
         requestBody: {
@@ -988,7 +1122,7 @@ export const updateUserMode = async (email, mode) => {
     } else {
       // Append new row (will be added after existing data)
       await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         range: 'Mode!A2:B', // Start from row 2 to skip header
         valueInputOption: 'RAW',
         requestBody: {
@@ -1017,9 +1151,14 @@ export const updateUserMode = async (email, mode) => {
 // Helper function to ensure ColorPalette sheet exists
 const ensureColorPaletteSheetExists = async (sheetsClient) => {
   try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
     // Try to get the spreadsheet to check if ColorPalette sheet exists
     const spreadsheet = await sheetsClient.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      spreadsheetId: loginSpreadsheetId,
     });
 
     const sheetsList = spreadsheet.data.sheets || [];
@@ -1030,7 +1169,7 @@ const ensureColorPaletteSheetExists = async (sheetsClient) => {
     if (!colorPaletteSheet) {
       // Create the ColorPalette sheet
       await sheetsClient.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         requestBody: {
           requests: [
             {
@@ -1047,7 +1186,7 @@ const ensureColorPaletteSheetExists = async (sheetsClient) => {
       // Add headers to the new sheet
       const headerValues = [['Email', 'LightModeColor', 'DarkModeColor']];
       await sheetsClient.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         range: 'ColorPalette!A1:C1',
         valueInputOption: 'RAW',
         requestBody: {
@@ -1068,14 +1207,20 @@ const ensureColorPaletteSheetExists = async (sheetsClient) => {
   }
 };
 
-export const getUserColorPalette = async (email) => {
+export const getUserColorPalette = async (email, accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'ColorPalette!A:C',
-    });
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
+    const data = await fetchFromSheets(
+      loginSpreadsheetId,
+      'ColorPalette!A:C',
+      accessToken
+    );
 
-    const rows = response.data.values || [];
+    const rows = data.values || [];
 
     for (const row of rows) {
       if (row.length >= 1 && row[0].toLowerCase() === email.toLowerCase()) {
@@ -1091,9 +1236,9 @@ export const getUserColorPalette = async (email) => {
 
     return { lightModeColor: null, darkModeColor: null };
   } catch (error) {
-    // If sheet doesn't exist, return default values
-    if (error.code === 400 && error.message && error.message.includes('Unable to parse range')) {
-      console.log('ColorPalette sheet does not exist yet, returning default values');
+    // If sheet doesn't exist or access denied, return default values
+    if (error.message && (error.message.includes('Unable to parse range') || error.message.includes('403'))) {
+      console.log('ColorPalette sheet does not exist yet or access denied, returning default values');
       return { lightModeColor: null, darkModeColor: null };
     }
     console.error('Error fetching user color palette:', error);
@@ -1103,6 +1248,11 @@ export const getUserColorPalette = async (email) => {
 
 export const updateUserColorPalette = async (email, lightModeColor, darkModeColor, accessToken = null) => {
   try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
     // Use OAuth if access token is provided, otherwise use API key (read-only)
     let sheetsClient = sheets;
     
@@ -1125,7 +1275,7 @@ export const updateUserColorPalette = async (email, lightModeColor, darkModeColo
     await ensureColorPaletteSheetExists(sheetsClient);
 
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
+      spreadsheetId: loginSpreadsheetId,
       range: 'ColorPalette!A:C',
     });
 
@@ -1148,7 +1298,7 @@ export const updateUserColorPalette = async (email, lightModeColor, darkModeColo
     if (rowIndex > 0) {
       // Update existing row
       await sheetsClient.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         range: `ColorPalette!A${rowIndex}:C${rowIndex}`,
         valueInputOption: 'RAW',
         requestBody: {
@@ -1158,7 +1308,7 @@ export const updateUserColorPalette = async (email, lightModeColor, darkModeColo
     } else {
       // Append new row
       await sheetsClient.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
+        spreadsheetId: loginSpreadsheetId,
         range: 'ColorPalette!A:C',
         valueInputOption: 'RAW',
         requestBody: {
@@ -1180,15 +1330,45 @@ export const updateUserColorPalette = async (email, lightModeColor, darkModeColo
 };
 
 // User profile functions
-// Sheet1 structure: A:Email, B:Password, C:Username, D:Photo
-export const getUserProfile = async (email) => {
+// UserDetail structure: A:Email, B:Password, C:Username, D:Photo
+export const getUserProfile = async (email, accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'Sheet1!A2:D100',
-    });
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
+    // Use "UserDetail" sheet name
+    const sheetRange = 'UserDetail!A2:D100';
+    let rows = [];
+    
+    if (accessToken) {
+      // Use fetch API directly with the access token (OAuth authentication)
+      const range = encodeURIComponent(sheetRange);
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${loginSpreadsheetId}/values/${range}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-    const rows = response.data.values || [];
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[getUserProfile] Google Sheets API error:', errorText);
+        throw new Error(`Failed to fetch user profile: ${response.status} ${errorText}`);
+      }
+
+      const data = await response.json();
+      rows = data.values || [];
+    } else {
+      // Fall back to googleapis library with API key (may fail for private sheets)
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: loginSpreadsheetId,
+        range: sheetRange,
+      });
+      rows = response.data.values || [];
+    }
 
     for (const row of rows) {
       if (row.length >= 2 && row[0].toLowerCase() === email.toLowerCase()) {
@@ -1216,9 +1396,14 @@ export const getUserProfile = async (email) => {
 
 export const updateUserProfile = async (email, username, photo = null) => {
   try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+    
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'Sheet1!A2:D100',
+      spreadsheetId: loginSpreadsheetId,
+      range: 'UserDetail!A2:D100',
     });
 
     const rows = response.data.values || [];
@@ -1238,8 +1423,8 @@ export const updateUserProfile = async (email, username, photo = null) => {
       
       if (username !== undefined) {
         await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_IDS.LOGIN,
-          range: `Sheet1!C${rowIndex}`,
+          spreadsheetId: loginSpreadsheetId,
+          range: `UserDetail!C${rowIndex}`,
           valueInputOption: 'RAW',
           requestBody: {
             values: [[username || 'NA']],
@@ -1258,8 +1443,8 @@ export const updateUserProfile = async (email, username, photo = null) => {
         }
         
         await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_IDS.LOGIN,
-          range: `Sheet1!D${rowIndex}`,
+          spreadsheetId: loginSpreadsheetId,
+          range: `UserDetail!D${rowIndex}`,
           valueInputOption: 'RAW',
           requestBody: {
             values: [[photoValue]],
@@ -1280,14 +1465,48 @@ export const updateUserProfile = async (email, username, photo = null) => {
 };
 
 // Update user photo from Google account during authentication
-export const updateUserPhotoFromGoogle = async (email, photoUrl) => {
+export const updateUserPhotoFromGoogle = async (email, photoUrl, accessToken = null) => {
   try {
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'Sheet1!A2:D100',
-    });
+    // Get LOGIN spreadsheet ID
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    
+    if (!loginSpreadsheetId || loginSpreadsheetId.trim() === '') {
+      console.warn('LOGIN_SPREADSHEET_ID not available, skipping photo update');
+      return false;
+    }
 
-    const rows = response.data.values || [];
+    // Use fetch API if access token is provided, otherwise use sheets client
+    let rows = [];
+    
+    if (accessToken) {
+      // Use fetch API directly with the access token
+      const range = encodeURIComponent('UserDetail!A2:D100');
+      const response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${loginSpreadsheetId}/values/${range}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error fetching user data for photo update:', errorText);
+        return false;
+      }
+
+      const data = await response.json();
+      rows = data.values || [];
+    } else {
+      // Use googleapis library
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: loginSpreadsheetId,
+        range: 'UserDetail!A2:D100',
+      });
+      rows = response.data.values || [];
+    }
+
     let rowIndex = -1;
 
     // Find the row for the current user's email
@@ -1302,26 +1521,51 @@ export const updateUserPhotoFromGoogle = async (email, photoUrl) => {
       // Only update if photo column is empty (don't overwrite user's uploaded photo)
       const currentPhoto = rows[rowIndex - 2][3] || '';
       if (!currentPhoto || currentPhoto.trim() === '') {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SPREADSHEET_IDS.LOGIN,
-          range: `Sheet1!D${rowIndex}`,
-          valueInputOption: 'RAW',
-          requestBody: {
-            values: [[photoUrl || '']],
-          },
-        });
+        if (accessToken) {
+          // Use fetch API for update
+          const updateRange = encodeURIComponent(`UserDetail!D${rowIndex}`);
+          const updateResponse = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${loginSpreadsheetId}/values/${updateRange}?valueInputOption=RAW`,
+            {
+              method: 'PUT',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                values: [[photoUrl || '']],
+              }),
+            }
+          );
+
+          if (!updateResponse.ok) {
+            console.error('Error updating photo:', await updateResponse.text());
+            return false;
+          }
+        } else {
+          // Use googleapis library for update
+          await sheets.spreadsheets.values.update({
+            spreadsheetId: loginSpreadsheetId,
+            range: `UserDetail!D${rowIndex}`,
+            valueInputOption: 'RAW',
+            requestBody: {
+              values: [[photoUrl || '']],
+            },
+          });
+        }
       }
     }
 
     return true;
   } catch (error) {
     console.error('Error updating user photo from Google:', error);
-    throw error;
+    // Don't throw error - photo update is optional
+    return false;
   }
 };
 
 // Update user password
-// Sheet1 structure: A:Email, B:Password, C:Username, D:Photo
+// UserDetail structure: A:Email, B:Password, C:Username, D:Photo
 export const updateUserPassword = async (email, currentPassword, newPassword) => {
   try {
     // First verify the current password
@@ -1330,10 +1574,15 @@ export const updateUserPassword = async (email, currentPassword, newPassword) =>
       throw new Error('Current password is incorrect');
     }
 
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    if (!loginSpreadsheetId) {
+      throw new Error('LOGIN_SPREADSHEET_ID is not configured');
+    }
+
     // Get the spreadsheet to find the user's row
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.LOGIN,
-      range: 'Sheet1!A2:D100',
+      spreadsheetId: loginSpreadsheetId,
+      range: 'UserDetail!A2:D100',
     });
 
     const rows = response.data.values || [];
@@ -1350,8 +1599,8 @@ export const updateUserPassword = async (email, currentPassword, newPassword) =>
     if (rowIndex > 0) {
       // Update password in column B
       await sheets.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_IDS.LOGIN,
-        range: `Sheet1!B${rowIndex}`,
+        spreadsheetId: loginSpreadsheetId,
+        range: `UserDetail!B${rowIndex}`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [[newPassword]],

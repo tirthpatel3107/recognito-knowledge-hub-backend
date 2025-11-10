@@ -3,36 +3,63 @@
  */
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import { authenticateUser, updateUserPhotoFromGoogle } from '../services/googleSheetsService.js';
-import { setUserCredentials } from '../services/googleSheetsService.js';
-import { GOOGLE_CONFIG } from '../config/googleConfig.js';
 import { google } from 'googleapis';
+import {
+  authenticateUser,
+  updateUserPhotoFromGoogle,
+  setUserCredentials,
+  initializeGoogleSheets,
+} from '../services/googleSheetsService.js';
+import { loadConfigFromSheet } from '../config/sheetConfigLoader.js';
+import {
+  GOOGLE_CONFIG,
+  getServiceConfigValue,
+  requireServiceConfigValue,
+} from '../config/googleConfig.js';
+import { storeGoogleToken } from '../services/googleTokenStore.js';
 
 const router = express.Router();
 
-// Login with email and password
+const extractTokenTtl = (accessTokenExpiresIn, expiresIn) => {
+  if (typeof accessTokenExpiresIn === 'number') {
+    return accessTokenExpiresIn;
+  }
+  if (typeof expiresIn === 'number') {
+    return expiresIn;
+  }
+  return null;
+};
+
+// Login with email, password, and one-time Google OAuth token
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, googleAccessToken, accessTokenExpiresIn, expiresIn } = req.body;
 
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({ error: 'Email and password are required' });
+      return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const isValid = await authenticateUser(email, password);
+    if (!googleAccessToken) {
+      return res.status(400).json({ error: 'Google access token is required for login' });
+    }
+
+    const isValid = await authenticateUser(email, password, googleAccessToken);
 
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { email },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    await loadConfigFromSheet(googleAccessToken);
+
+    initializeGoogleSheets();
+
+    const tokenTtlSeconds = extractTokenTtl(accessTokenExpiresIn, expiresIn);
+    storeGoogleToken(email, googleAccessToken, { expiresInSeconds: tokenTtlSeconds });
+
+    const jwtSecret = requireServiceConfigValue('JWT_SECRET');
+    const jwtExpiresIn = getServiceConfigValue('JWT_EXPIRES_IN') || '24h';
+
+    const token = jwt.sign({ email }, jwtSecret, { expiresIn: jwtExpiresIn });
 
     res.json({
       success: true,
@@ -49,45 +76,75 @@ router.post('/login', async (req, res) => {
 // Verify Google OAuth token and get user info
 router.post('/google/verify', async (req, res) => {
   try {
-    const { accessToken, expectedEmail } = req.body;
+    const { accessToken, expectedEmail, accessTokenExpiresIn, expiresIn } = req.body;
 
     if (!accessToken) {
       return res.status(400).json({ error: 'Access token is required' });
     }
 
-    // Verify token with Google
-    const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CONFIG.CLIENT_ID,
-      GOOGLE_CONFIG.CLIENT_SECRET
-    );
-
-    oauth2Client.setCredentials({ access_token: accessToken });
-
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const userInfo = await oauth2.userinfo.get();
-
-    const googleEmail = userInfo.data.email;
-    const googlePhoto = userInfo.data.picture || '';
-
-    // If expected email provided, verify it matches
-    if (expectedEmail && googleEmail.toLowerCase() !== expectedEmail.toLowerCase()) {
-      return res.status(403).json({
-        error: 'Email mismatch',
-        expected: expectedEmail,
-        received: googleEmail,
+    // First, verify the token by calling Google's userinfo API directly
+    // This doesn't require CLIENT_ID/CLIENT_SECRET - just the access token
+    let googleEmail;
+    let googlePhoto;
+    
+    try {
+      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
+
+      if (!userInfoResponse.ok) {
+        const errorText = await userInfoResponse.text();
+        console.error('Google userinfo API error:', errorText);
+        return res.status(401).json({ error: 'Invalid Google access token' });
+      }
+
+      const userInfo = await userInfoResponse.json();
+      googleEmail = userInfo.email;
+      googlePhoto = userInfo.picture || '';
+
+      // Verify email matches if expected
+      if (expectedEmail && googleEmail.toLowerCase() !== expectedEmail.toLowerCase()) {
+        return res.status(403).json({
+          error: 'Email mismatch',
+          expected: expectedEmail,
+          received: googleEmail,
+        });
+      }
+    } catch (tokenError) {
+      console.error('Error verifying Google token:', tokenError);
+      return res.status(401).json({ error: 'Invalid Google access token' });
     }
 
-    // Set user credentials for subsequent API calls
-    setUserCredentials(accessToken);
+    // Now load config from the sheet using the verified token
+    try {
+      await loadConfigFromSheet(accessToken);
+      initializeGoogleSheets();
+    } catch (configError) {
+      console.error('Error loading config from sheet:', configError);
+      // If config loading fails, we can still proceed but log the error
+      // The token is valid, so we can store it and return success
+    }
 
-    // Save Google account photo to Sheet1 if available
+    // Store the token for future use
+    const tokenTtlSeconds = extractTokenTtl(accessTokenExpiresIn, expiresIn);
+    storeGoogleToken(googleEmail, accessToken, { expiresInSeconds: tokenTtlSeconds });
+
+    // Set user credentials for Google Sheets API (if config was loaded)
+    try {
+      setUserCredentials(accessToken);
+    } catch (credError) {
+      console.warn('Could not set user credentials (config may not be loaded):', credError);
+    }
+
+    // Try to update user photo (optional, don't fail if this errors)
     if (googlePhoto) {
       try {
-        await updateUserPhotoFromGoogle(googleEmail, googlePhoto);
-      } catch (error) {
-        console.error('Error saving Google photo to sheet:', error);
-        // Don't fail authentication if photo save fails
+        await updateUserPhotoFromGoogle(googleEmail, googlePhoto, accessToken);
+      } catch (photoError) {
+        console.error('Error saving Google photo to sheet:', photoError);
+        // Don't fail the request if photo update fails
       }
     }
 
@@ -99,13 +156,12 @@ router.post('/google/verify', async (req, res) => {
     });
   } catch (error) {
     console.error('Google verification error:', error);
-    res.status(401).json({ error: 'Invalid Google access token' });
+    res.status(500).json({ error: 'Internal server error during Google verification' });
   }
 });
 
 // Refresh token endpoint (if needed)
 router.post('/refresh', (req, res) => {
-  // TODO: Implement token refresh logic if needed
   res.status(501).json({ error: 'Not implemented' });
 });
 
