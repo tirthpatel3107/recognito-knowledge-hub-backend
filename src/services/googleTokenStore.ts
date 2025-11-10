@@ -1,19 +1,33 @@
-﻿/**
+/**
  * In-memory store for Google OAuth access tokens keyed by user email.
  * Tokens are cached after the initial Google login to avoid repeated authentication prompts.
  */
 
-const tokenStore = new Map();
+interface TokenEntry {
+  accessToken: string;
+  expiresAt: number | null;
+  updatedAt: number;
+}
 
-const normalizeEmail = (email = '') => email.trim().toLowerCase();
+const tokenStore = new Map<string, TokenEntry>();
 
-export const storeGoogleToken = (email, accessToken, { expiresInSeconds = null } = {}) => {
+const normalizeEmail = (email: string = ''): string => email.trim().toLowerCase();
+
+interface StoreTokenOptions {
+  expiresInSeconds?: number | null;
+}
+
+export const storeGoogleToken = (
+  email: string,
+  accessToken: string,
+  { expiresInSeconds = null }: StoreTokenOptions = {}
+): TokenEntry => {
   if (!email || !accessToken) {
     throw new Error('Email and access token are required to store Google credentials.');
   }
 
   const normalizedEmail = normalizeEmail(email);
-  const entry = {
+  const entry: TokenEntry = {
     accessToken,
     expiresAt:
       typeof expiresInSeconds === 'number' && expiresInSeconds > 0
@@ -27,7 +41,7 @@ export const storeGoogleToken = (email, accessToken, { expiresInSeconds = null }
   return entry;
 };
 
-export const getGoogleToken = (email) => {
+export const getGoogleToken = (email: string): string | null => {
   if (!email) {
     return null;
   }
@@ -47,15 +61,16 @@ export const getGoogleToken = (email) => {
   return entry.accessToken;
 };
 
-export const clearGoogleToken = (email) => {
+export const clearGoogleToken = (email: string): void => {
   if (!email) {
     return;
   }
   tokenStore.delete(normalizeEmail(email));
 };
 
-export const hasGoogleToken = (email) => getGoogleToken(email) !== null;
+export const hasGoogleToken = (email: string): boolean => getGoogleToken(email) !== null;
 
-export const resetTokenStore = () => {
+export const resetTokenStore = (): void => {
   tokenStore.clear();
 };
+

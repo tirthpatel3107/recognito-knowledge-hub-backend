@@ -1,9 +1,40 @@
-﻿/**
+/**
  * Google API configuration populated from the secured Google Sheet.
  * The only environment variable read at runtime is LOGIN_SPREADSHEET_ID.
  */
 
-export const GOOGLE_CONFIG = {
+export interface GoogleConfig {
+  API_KEY: string;
+  CLIENT_ID: string;
+  CLIENT_SECRET: string;
+  REDIRECT_URI: string;
+  SCOPES: string[];
+}
+
+export interface SpreadsheetIds {
+  LOGIN: string;
+  QUESTION_BANK: string;
+  PRACTICAL_TASKS: string;
+  WORK_SUMMARY: string;
+  PROJECT_LISTING: string;
+}
+
+export interface DocIds {
+  TODO: string;
+  CREDENTIAL: string;
+  WORK_SUMMARY: string;
+  PROJECT: string;
+}
+
+export interface ServiceConfig {
+  JWT_SECRET: string;
+  FRONTEND_URL: string;
+  PORT: number;
+  NODE_ENV: string;
+  JWT_EXPIRES_IN: string;
+}
+
+export const GOOGLE_CONFIG: GoogleConfig = {
   API_KEY: '',
   CLIENT_ID: '',
   CLIENT_SECRET: '',
@@ -15,7 +46,7 @@ export const GOOGLE_CONFIG = {
   ],
 };
 
-export const SPREADSHEET_IDS = {
+export const SPREADSHEET_IDS: SpreadsheetIds = {
   LOGIN: process.env.LOGIN_SPREADSHEET_ID || '',
   QUESTION_BANK: '',
   PRACTICAL_TASKS: '',
@@ -23,14 +54,14 @@ export const SPREADSHEET_IDS = {
   PROJECT_LISTING: '',
 };
 
-export const DOC_IDS = {
+export const DOC_IDS: DocIds = {
   TODO: '',
   CREDENTIAL: '',
   WORK_SUMMARY: '',
   PROJECT: '',
 };
 
-const SERVICE_CONFIG = {
+const SERVICE_CONFIG: ServiceConfig = {
   JWT_SECRET: '',
   FRONTEND_URL: 'http://localhost:5173',
   PORT: 3001,
@@ -40,14 +71,14 @@ const SERVICE_CONFIG = {
 
 let configLoaded = false;
 
-const normalizeKey = (key = '') => key.trim().toUpperCase();
+const normalizeKey = (key: string = ''): string => key.trim().toUpperCase();
 
-export const applySheetConfig = (configMap = {}) => {
+export const applySheetConfig = (configMap: Record<string, string> = {}): void => {
   const normalizedEntries = Object.entries(configMap)
     .filter(([key]) => typeof key === 'string' && key.trim() !== '')
     .map(([key, value]) => [normalizeKey(key), value?.toString() ?? '']);
 
-  const normalizedConfig = Object.fromEntries(normalizedEntries);
+  const normalizedConfig = Object.fromEntries(normalizedEntries) as Record<string, string>;
 
   GOOGLE_CONFIG.API_KEY = normalizedConfig.GOOGLE_API_KEY ?? GOOGLE_CONFIG.API_KEY;
   GOOGLE_CONFIG.CLIENT_ID = normalizedConfig.GOOGLE_CLIENT_ID ?? GOOGLE_CONFIG.CLIENT_ID;
@@ -91,14 +122,14 @@ export const applySheetConfig = (configMap = {}) => {
   configLoaded = true;
 };
 
-export const isConfigLoaded = () => configLoaded;
+export const isConfigLoaded = (): boolean => configLoaded;
 
-export const getServiceConfigValue = (key) => {
+export const getServiceConfigValue = (key: string): string | number | null => {
   const normalized = normalizeKey(key);
-  return SERVICE_CONFIG[normalized] ?? null;
+  return (SERVICE_CONFIG as any)[normalized] ?? null;
 };
 
-export const requireServiceConfigValue = (key) => {
+export const requireServiceConfigValue = (key: string): string | number => {
   const value = getServiceConfigValue(key);
   if (value === null || value === undefined || value === '') {
     throw new Error(`Missing required configuration value: ${normalizeKey(key)}`);
@@ -106,4 +137,5 @@ export const requireServiceConfigValue = (key) => {
   return value;
 };
 
-export const getAllServiceConfig = () => ({ ...SERVICE_CONFIG });
+export const getAllServiceConfig = (): ServiceConfig => ({ ...SERVICE_CONFIG });
+

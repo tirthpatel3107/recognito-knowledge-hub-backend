@@ -1,15 +1,15 @@
-﻿/**
+/**
  * Loads backend configuration from the secured Google Sheet's Config tab.
  */
 
-import { applySheetConfig, isConfigLoaded, SPREADSHEET_IDS } from './googleConfig.js';
+import { applySheetConfig, isConfigLoaded, SPREADSHEET_IDS } from './googleConfig';
 
 const CONFIG_RANGE = encodeURIComponent('Config!A:B');
 
-let cachedConfig = null;
-let lastLoadedAt = null;
+let cachedConfig: Record<string, string> | null = null;
+let lastLoadedAt: Date | null = null;
 
-const ensureFetchAvailable = () => {
+const ensureFetchAvailable = (): void => {
   if (typeof fetch !== 'function') {
     throw new Error(
       'Global fetch API is not available. Please run on Node.js 18+ or provide a fetch polyfill.'
@@ -17,7 +17,14 @@ const ensureFetchAvailable = () => {
   }
 };
 
-export const loadConfigFromSheet = async (accessToken, { forceReload = false } = {}) => {
+interface LoadConfigOptions {
+  forceReload?: boolean;
+}
+
+export const loadConfigFromSheet = async (
+  accessToken: string,
+  { forceReload = false }: LoadConfigOptions = {}
+): Promise<Record<string, string>> => {
   if (!forceReload && isConfigLoaded() && cachedConfig) {
     return cachedConfig;
   }
@@ -27,9 +34,9 @@ export const loadConfigFromSheet = async (accessToken, { forceReload = false } =
   }
 
   // Get LOGIN_SPREADSHEET_ID from environment variable directly
-  // This is set in .env file and loaded by dotenv.config() in index.js
+  // This is set in .env file and loaded by dotenv.config() in index.ts
   const loginSpreadsheetId = process.env.LOGIN_SPREADSHEET_ID || SPREADSHEET_IDS.LOGIN;
-  
+
   if (!loginSpreadsheetId || loginSpreadsheetId.trim() === '') {
     throw new Error(
       'LOGIN_SPREADSHEET_ID is not configured. Set it in the .env file and restart the server.'
@@ -54,14 +61,14 @@ export const loadConfigFromSheet = async (accessToken, { forceReload = false } =
     );
   }
 
-  const payload = await response.json();
+  const payload = await response.json() as { values?: string[][] };
   const rows = payload.values || [];
 
   if (rows.length < 2) {
     throw new Error('Config sheet is empty or missing key/value rows.');
   }
 
-  const configMap = {};
+  const configMap: Record<string, string> = {};
 
   for (let i = 1; i < rows.length; i += 1) {
     const [rawKey, rawValue] = rows[i];
@@ -78,12 +85,13 @@ export const loadConfigFromSheet = async (accessToken, { forceReload = false } =
   return cachedConfig;
 };
 
-export const getCachedConfig = () => {
+export const getCachedConfig = (): { loadedAt: Date; values: Record<string, string> } | null => {
   if (!cachedConfig) {
     return null;
   }
   return {
-    loadedAt: lastLoadedAt,
+    loadedAt: lastLoadedAt!,
     values: { ...cachedConfig },
   };
 };
+
