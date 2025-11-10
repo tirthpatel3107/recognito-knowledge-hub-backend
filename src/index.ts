@@ -46,128 +46,42 @@ const NODE_ENV = getServiceConfigValue('NODE_ENV') || 'development';
 // Initialize Google Sheets service (will be refreshed after config loads)
 initializeGoogleSheets();
 
-// Dynamic CORS middleware that reads from config (allows config to be loaded after server starts)
-// Default allowed origins before config is loaded from Google Sheet
-const DEFAULT_ALLOWED_ORIGINS = [
-  'http://localhost:8080',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:8080',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000',
-];
-
-// Get allowed origins (dynamic based on config)
-const getAllowedOrigins = (): string[] => {
-  try {
-    const configuredOrigin = getServiceConfigValue('FRONTEND_URL') as string;
-    const nodeEnv = getServiceConfigValue('NODE_ENV') || 'development';
-
-    if (configuredOrigin && configuredOrigin.trim()) {
-      const origin = configuredOrigin.trim();
-      console.log(`[CORS] Using configured origin: ${origin}`);
-
-      // In development mode, also allow common localhost origins for flexibility
-      // This helps when frontend port changes or multiple dev servers are running
-      if (nodeEnv === 'development' || nodeEnv === 'dev') {
-        const developmentOrigins = [
-          origin, // Primary configured origin
-          ...DEFAULT_ALLOWED_ORIGINS.filter((o) => o !== origin), // Other localhost origins
-        ];
-        console.log(
-          `[CORS] Development mode: Allowing multiple localhost origins: ${developmentOrigins.join(', ')}`
-        );
-        return developmentOrigins;
-      }
-
-      // In production, only allow the configured origin
-      return [origin];
-    }
-  } catch (error) {
-    console.error('[CORS] Error reading FRONTEND_URL from config:', error);
-  }
-
-  // Return default origins if config not loaded yet
-  console.log(
-    `[CORS] Using default origins (config not loaded): ${DEFAULT_ALLOWED_ORIGINS.join(', ')}`
-  );
-  return DEFAULT_ALLOWED_ORIGINS;
-};
-
-// Normalize origin for comparison (trim, lowercase)
-const normalizeOrigin = (origin: string | undefined): string | null => {
-  if (!origin) return null;
-  return origin.trim().toLowerCase();
-};
-
-// CORS configuration with dynamic origin support
+// CORS configuration - Allow all origins (no restrictions)
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
-  const allowedOrigins = getAllowedOrigins();
-  const configuredOrigin = getServiceConfigValue('FRONTEND_URL') as string;
 
-  // Normalize for comparison
-  const normalizedOrigin = normalizeOrigin(origin);
-  const normalizedAllowedOrigins = allowedOrigins.map(normalizeOrigin);
-
-  // Log CORS checks for debugging
+  // Log CORS requests for debugging
   if (req.method === 'OPTIONS' || req.method === 'POST') {
     console.log(`[CORS] ${req.method} request from origin: ${origin || 'none'}`);
-    console.log(`[CORS] Allowed origins: ${allowedOrigins.join(', ')}`);
-    console.log(`[CORS] Normalized origin: ${normalizedOrigin || 'none'}`);
-    console.log(`[CORS] Is allowed: ${!origin || normalizedAllowedOrigins.includes(normalizedOrigin)}`);
   }
 
-  // Check if origin is allowed (allow requests with no origin for same-origin requests)
-  const isOriginAllowed = !origin || normalizedAllowedOrigins.includes(normalizedOrigin);
-
-  // Handle preflight OPTIONS requests first
+  // Handle preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
-    if (isOriginAllowed) {
-      // Set CORS headers for allowed origin
-      if (origin) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        if (!configuredOrigin) {
-          console.log(`[CORS] ✓ Preflight approved for origin ${origin} (config not loaded yet)`);
-        } else {
-          console.log(
-            `[CORS] ✓ Preflight approved for origin ${origin} (matches configured: ${configuredOrigin})`
-          );
-        }
-      }
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader(
-        'Access-Control-Allow-Methods',
-        'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD'
-      );
-      res.setHeader(
-        'Access-Control-Allow-Headers',
-        'Content-Type, Authorization, X-Google-Token, X-Requested-With, Accept'
-      );
-      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-      return res.status(200).end();
-    } else {
-      // Origin not allowed - respond without CORS headers (browser will block)
-      console.warn(
-        `[CORS] ✗ Preflight blocked for origin: ${origin} (allowed: ${allowedOrigins.join(', ')})`
-      );
-      return res.status(403).end();
-    }
-  }
-
-  // For non-OPTIONS requests, set CORS headers if origin is allowed
-  if (isOriginAllowed) {
+    // Allow any origin - set to requesting origin (required when credentials are true)
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
     }
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Authorization');
-  } else {
-    console.warn(
-      `[CORS] ✗ Request blocked for origin: ${origin} (allowed: ${allowedOrigins.join(', ')})`
+    res.setHeader(
+      'Access-Control-Allow-Methods',
+      'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD'
     );
-    // Don't set CORS headers - browser will block the response
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, X-Google-Token, X-Requested-With, Accept'
+    );
+    res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+    console.log(`[CORS] ✓ Preflight approved for origin: ${origin || 'all'}`);
+    return res.status(200).end();
   }
+
+  // For non-OPTIONS requests, set CORS headers to allow any origin
+  // Note: When credentials are true, we must set specific origin, not '*'
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Authorization');
 
   next();
 });
