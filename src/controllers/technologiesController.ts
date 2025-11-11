@@ -93,12 +93,12 @@ export const deleteTechnologyHandler = asyncHandler(async (req: Request, res: Re
 
   // Set user credentials and proceed with deletion
   setUserCredentials(googleToken);
-  const success = await deleteTechnology(parseInt(sheetId));
+  const result = await deleteTechnology(parseInt(sheetId));
 
-  if (success) {
+  if (result.success) {
     return sendSuccess(res, null, 'Technology deleted successfully');
   } else {
-    return sendError(res, 'Failed to delete technology', 500);
+    return sendError(res, result.error || 'Failed to delete technology', 400);
   }
 });
 

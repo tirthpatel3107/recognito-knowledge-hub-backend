@@ -23,14 +23,15 @@ import { ValidationError } from '../utils/errorHandler';
 const extractTokenTtl = (
   accessTokenExpiresIn?: number,
   expiresIn?: number
-): number | null => {
-  if (typeof accessTokenExpiresIn === 'number') {
+): number => {
+  if (typeof accessTokenExpiresIn === 'number' && accessTokenExpiresIn > 0) {
     return accessTokenExpiresIn;
   }
-  if (typeof expiresIn === 'number') {
+  if (typeof expiresIn === 'number' && expiresIn > 0) {
     return expiresIn;
   }
-  return null;
+  // Default to 24 hours (86400 seconds) if not provided
+  return 24 * 60 * 60; // 24 hours in seconds
 };
 
 /**

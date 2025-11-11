@@ -246,9 +246,26 @@ export const updateTechnology = async (
 /**
  * Delete technology (sheet)
  */
-export const deleteTechnology = async (sheetId: number): Promise<boolean> => {
+export const deleteTechnology = async (sheetId: number): Promise<{ success: boolean; error?: string }> => {
   try {
     const sheetsClient = getSheetsClient();
+    
+    // First, check how many sheets exist
+    const spreadsheet = await sheetsClient.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+    });
+    
+    const sheets = spreadsheet.data.sheets || [];
+    
+    // Google Sheets requires at least one sheet, so prevent deleting the last one
+    if (sheets.length <= 1) {
+      return {
+        success: false,
+        error: "Cannot delete the last sheet. A spreadsheet must have at least one sheet."
+      };
+    }
+    
+    // Proceed with deletion
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
       requestBody: {
@@ -261,10 +278,22 @@ export const deleteTechnology = async (sheetId: number): Promise<boolean> => {
         ],
       },
     });
-    return true;
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
     console.error('Error deleting technology:', error);
-    return false;
+    
+    // Check for specific Google Sheets API error
+    if (error?.message?.includes("You can't remove all the sheets")) {
+      return {
+        success: false,
+        error: "Cannot delete the last sheet. A spreadsheet must have at least one sheet."
+      };
+    }
+    
+    return {
+      success: false,
+      error: error?.message || 'Failed to delete technology'
+    };
   }
 };
 
