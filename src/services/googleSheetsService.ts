@@ -847,10 +847,25 @@ export const getDashboardCardOrder = async (
   accessToken: string | null = null
 ): Promise<string[]> => {
   try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
-    // This would typically be stored in a user preferences sheet
-    // For now, return default order
-    return ['question-bank', 'todo', 'credential', 'work-summary', 'practical-task'];
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: loginSpreadsheetId,
+      range: 'DashboardOrder!A:Z',
+    });
+
+    const rows = response.data.values || [];
+    
+    // Find the row for the current user's email
+    for (const row of rows) {
+      if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
+        // Return the card IDs (excluding the email column)
+        return row.slice(1).filter((id: string) => id && id.trim() !== '');
+      }
+    }
+
+    // Return empty array if user not found (will use default order)
+    return [];
   } catch (error) {
     console.error('Error getting dashboard card order:', error);
     return [];
@@ -862,11 +877,54 @@ export const getDashboardCardOrder = async (
  */
 export const saveDashboardCardOrder = async (
   email: string,
-  cardOrder: string[]
+  cardOrder: string[],
+  accessToken: string | null = null
 ): Promise<boolean> => {
   try {
-    // This would typically save to a user preferences sheet
-    // For now, just return true
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    const sheetsClient = getSheetsClient(accessToken);
+    
+    // First, try to find if user already has a row
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: loginSpreadsheetId,
+      range: 'DashboardOrder!A:Z',
+    });
+
+    const rows = response.data.values || [];
+    let rowIndex = -1;
+
+    // Find the row for the current user's email
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].length > 0 && rows[i][0]?.toLowerCase() === email.toLowerCase()) {
+        rowIndex = i + 1; // +1 because sheets are 1-indexed
+        break;
+      }
+    }
+
+    const values = [[email, ...cardOrder]];
+
+    if (rowIndex > 0) {
+      // Update existing row
+      await sheetsClient.spreadsheets.values.update({
+        spreadsheetId: loginSpreadsheetId,
+        range: `DashboardOrder!A${rowIndex}:Z${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: values,
+        },
+      });
+    } else {
+      // Append new row
+      await sheetsClient.spreadsheets.values.append({
+        spreadsheetId: loginSpreadsheetId,
+        range: 'DashboardOrder!A:Z',
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: values,
+        },
+      });
+    }
+
     return true;
   } catch (error) {
     console.error('Error saving dashboard card order:', error);
@@ -982,11 +1040,12 @@ export const getUserProfile = async (
 export const updateUserProfile = async (
   email: string,
   username?: string,
-  photo?: string | null
+  photo?: string | null,
+  accessToken: string | null = null
 ): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
       range: 'UserDetail!A2:D100',
@@ -1003,7 +1062,14 @@ export const updateUserProfile = async (
     }
 
     if (rowIndex === -1) {
+      console.error('User not found in UserDetail sheet:', email);
       return false;
+    }
+
+    // Validate photo size (Google Sheets cell limit is 50,000 characters)
+    if (photo !== undefined && photo !== null && photo.length > 50000) {
+      console.error('Photo data too large:', photo.length, 'characters (max 50,000)');
+      throw new Error('Photo is too large. Please use a smaller image (max size: ~37KB when base64 encoded)');
     }
 
     const updates: any[] = [];
@@ -1028,10 +1094,14 @@ export const updateUserProfile = async (
           data: updates,
         },
       });
+      console.log('Profile updated successfully for user:', email);
     }
     return true;
   } catch (error) {
     console.error('Error updating user profile:', error);
+    if (error instanceof Error) {
+      throw error; // Re-throw to pass error message to caller
+    }
     return false;
   }
 };

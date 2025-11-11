@@ -38,13 +38,14 @@ export const getDashboardCardOrderHandler = asyncHandler(async (req: Request, re
  */
 export const saveDashboardCardOrderHandler = asyncHandler(async (req: Request, res: Response) => {
   const email = req.user!.email;
+  const googleToken = getGoogleTokenFromRequest(req);
   const { cardOrder } = req.body;
 
   if (!Array.isArray(cardOrder)) {
     return sendValidationError(res, 'cardOrder must be an array');
   }
 
-  const success = await saveDashboardCardOrder(email, cardOrder);
+  const success = await saveDashboardCardOrder(email, cardOrder, googleToken);
 
   if (success) {
     return sendSuccess(res, null, 'Dashboard card order saved successfully');
@@ -111,8 +112,8 @@ export const getUserProfileHandler = asyncHandler(async (req: Request, res: Resp
  * Update user profile
  */
 export const updateUserProfileHandler = asyncHandler(async (req: Request, res: Response) => {
-  setUserCredentials(req.googleToken!);
   const email = req.user!.email;
+  const googleToken = getGoogleTokenFromRequest(req);
   const { username, photo } = req.body;
 
   // Username is optional (can be updated separately), but validate if provided
@@ -120,16 +121,23 @@ export const updateUserProfileHandler = asyncHandler(async (req: Request, res: R
     return sendValidationError(res, 'Username cannot be empty');
   }
 
-  const success = await updateUserProfile(
-    email,
-    username !== undefined ? username.trim() : undefined,
-    photo !== undefined ? photo : null
-  );
+  try {
+    const success = await updateUserProfile(
+      email,
+      username !== undefined ? username.trim() : undefined,
+      photo !== undefined ? photo : null,
+      googleToken
+    );
 
-  if (success) {
-    return sendSuccess(res, null, 'Profile updated successfully');
-  } else {
-    return sendError(res, 'Failed to update profile', 500);
+    if (success) {
+      return sendSuccess(res, null, 'Profile updated successfully');
+    } else {
+      return sendError(res, 'Failed to update profile', 500);
+    }
+  } catch (error) {
+    console.error('Error in updateUserProfileHandler:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update profile';
+    return sendError(res, errorMessage, 500);
   }
 });
 
