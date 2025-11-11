@@ -36,10 +36,14 @@ import userRoutes from './routes/user.js';
 
 // Import services to initialize
 import { initializeGoogleSheets } from './services/googleSheetsService.js';
-import { getServiceConfigValue } from './config/googleConfig.js';
+import { getServiceConfigValue, loadPersistedConfig } from './config/googleConfig.js';
 import { errorHandler } from './utils/errorHandler.js';
 
 const app = express();
+
+// Load persisted config from disk first (so JWT_SECRET is available after restarts)
+await loadPersistedConfig();
+
 const PORT = Number(getServiceConfigValue('PORT')) || 3001;
 const NODE_ENV = getServiceConfigValue('NODE_ENV') || 'development';
 
@@ -68,7 +72,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     );
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization, X-Google-Token, X-Requested-With, Accept'
+      'Content-Type, Authorization, X-Google-Token, X-Requested-With, Accept, Cache-Control, Pragma, Expires'
     );
     res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
     console.log(`[CORS] ✓ Preflight approved for origin: ${origin || 'all'}`);
@@ -83,6 +87,18 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Authorization');
 
+  next();
+});
+
+// Disable ETags to prevent 304 responses - we always want status 200 with actual data
+app.set('etag', false);
+
+// Middleware to add cache-control headers to prevent 304 responses
+app.use((req: Request, res: Response, next: NextFunction) => {
+  // Always set cache-control headers to prevent 304 responses
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   next();
 });
 

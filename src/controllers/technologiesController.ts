@@ -20,9 +20,21 @@ import { getGoogleTokenFromRequest } from '../utils/googleTokenHelper';
  * Get all technologies
  */
 export const getAllTechnologies = asyncHandler(async (req: Request, res: Response) => {
-  const googleToken = getGoogleTokenFromRequest(req);
-  const technologies = await getTechnologies(googleToken);
-  return sendSuccess(res, technologies);
+  try {
+    const googleToken = getGoogleTokenFromRequest(req);
+    const technologies = await getTechnologies(googleToken);
+    return sendSuccess(res, technologies);
+  } catch (error: any) {
+    // Provide more helpful error messages
+    if (error.message && error.message.includes('QUESTION_BANK_SPREADSHEET_ID is not configured')) {
+      return sendError(res, 'Configuration not loaded. Please authenticate first to load configuration from Google Sheets.', 503);
+    }
+    if (error.message && error.message.includes('Google API key is not configured')) {
+      return sendError(res, 'Google API key is not configured. Please authenticate to load configuration.', 503);
+    }
+    // Re-throw to let asyncHandler handle it
+    throw error;
+  }
 });
 
 /**

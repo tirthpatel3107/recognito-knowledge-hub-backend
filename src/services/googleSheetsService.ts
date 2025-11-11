@@ -166,6 +166,13 @@ export const updateUserPhotoFromGoogle = async (
  */
 export const getTechnologies = async (accessToken: string | null = null): Promise<Technology[]> => {
   try {
+    // Check if QUESTION_BANK spreadsheet ID is configured
+    if (!SPREADSHEET_IDS.QUESTION_BANK || SPREADSHEET_IDS.QUESTION_BANK.trim() === '') {
+      const errorMsg = 'QUESTION_BANK_SPREADSHEET_ID is not configured. Please authenticate to load configuration.';
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.get({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
@@ -177,9 +184,10 @@ export const getTechnologies = async (accessToken: string | null = null): Promis
       name: sheet.properties.title,
       sheetId: sheet.properties.sheetId,
     }));
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error getting technologies:', error);
-    return [];
+    // Re-throw the error so the controller can handle it properly
+    throw error;
   }
 };
 
@@ -327,7 +335,36 @@ export const reorderTechnologies = async (technologyIds: number[]): Promise<bool
 // ==================== Questions ====================
 
 /**
+ * Split text into chunks of max 50,000 characters (Google Sheets cell limit)
+ */
+const splitTextIntoChunks = (text: string, maxLength: number = 50000): string[] => {
+  if (text.length <= maxLength) {
+    return [text];
+  }
+  const chunks: string[] = [];
+  for (let i = 0; i < text.length; i += maxLength) {
+    chunks.push(text.substring(i, i + maxLength));
+  }
+  return chunks;
+};
+
+/**
+ * Convert column index (0-based) to column letter (A, B, ..., Z, AA, AB, ...)
+ */
+const getColumnLetter = (colIndex: number): string => {
+  let result = '';
+  let num = colIndex;
+  while (num >= 0) {
+    result = String.fromCharCode(65 + (num % 26)) + result;
+    num = Math.floor(num / 26) - 1;
+  }
+  return result;
+};
+
+/**
  * Get questions for a technology
+ * Handles text that may be split across multiple columns
+ * Structure: A=Serial, B=Q1, C=A1, D=Images1, E=FirstImage1, F=Q2, G=A2, H=Images2, I=FirstImage2, ...
  */
 export const getQuestions = async (
   technologyName: string,
@@ -335,18 +372,81 @@ export const getQuestions = async (
 ): Promise<Question[]> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
+    // Read up to column Z to handle split text
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
-      range: `${technologyName}!A2:E1000`,
+      range: `${technologyName}!A2:Z1000`,
     });
 
     const rows = response.data.values || [];
-    return rows.map((row: any[], index: number) => ({
-      id: `q-${index}`,
-      question: row[1] || '',
-      answer: row[2] || '',
-      imageUrls: row[3] ? row[3].split(',').map((url: string) => url.trim()) : [],
-    }));
+    return rows.map((row: any[], index: number) => {
+      // Reconstruct question, answer, imageUrls, and firstImage from multiple columns
+      // Each group is 4 columns: [Q, A, Images, FirstImage]
+      let question = '';
+      let answer = '';
+      let imageUrlsString = '';
+      let firstImage = '';
+
+      // Process in groups of 4 columns starting from index 1 (after Serial number)
+      for (let i = 1; i < row.length; i += 4) {
+        if (row[i]) question += row[i]; // Question chunk
+        if (row[i + 1]) answer += row[i + 1]; // Answer chunk
+        if (row[i + 2]) imageUrlsString += row[i + 2]; // Image URLs chunk
+        if (row[i + 3]) firstImage += row[i + 3]; // First image chunk
+      }
+
+      // Parse image URLs (combine all chunks and split by delimiter)
+      // Use ||| as delimiter to avoid conflicts with base64 data URLs which contain commas
+      // Support backward compatibility with comma delimiter for old data
+      let imageUrls: string[] = [];
+      if (imageUrlsString) {
+        // Try new format first (||| delimiter)
+        if (imageUrlsString.includes('|||')) {
+          imageUrls = imageUrlsString.split('|||').map((url: string) => url.trim()).filter(Boolean);
+        } else {
+          // Old format: comma delimiter
+          // Base64 data URLs have format: data:image/png;base64,<data>
+          // When split by comma, single image becomes: ["data:image/png;base64", "<data>"]
+          // We need to detect this pattern and reconstruct the URL
+          const commaSplit = imageUrlsString.split(',');
+          if (commaSplit.length === 2 && commaSplit[0].includes('base64') && !commaSplit[1].includes('data:')) {
+            // This is likely a single base64 image that was incorrectly split
+            // Reconstruct it by joining with comma
+            imageUrls = [commaSplit.join(',')];
+          } else {
+            // Multiple images or different format - try to reconstruct intelligently
+            const reconstructed: string[] = [];
+            let current = '';
+            for (let i = 0; i < commaSplit.length; i++) {
+              const part = commaSplit[i].trim();
+              if (!part) continue;
+              
+              if (part.startsWith('data:') || part.startsWith('http://') || part.startsWith('https://')) {
+                // This is a new URL start
+                if (current) {
+                  reconstructed.push(current);
+                }
+                current = part;
+              } else if (current) {
+                // This is continuation of current URL (base64 data after the comma)
+                current += ',' + part;
+              }
+            }
+            if (current) {
+              reconstructed.push(current);
+            }
+            imageUrls = reconstructed.length > 0 ? reconstructed : commaSplit.filter(Boolean);
+          }
+        }
+      }
+
+      return {
+        id: `q-${index}`,
+        question,
+        answer,
+        imageUrls,
+      };
+    });
   } catch (error) {
     console.error('Error getting questions:', error);
     return [];
@@ -355,6 +455,8 @@ export const getQuestions = async (
 
 /**
  * Add a question
+ * Splits long text across multiple cells to handle Google Sheets 50,000 character limit
+ * No validation - automatically handles unlimited characters by chunking
  */
 export const addQuestion = async (
   technologyName: string,
@@ -362,7 +464,6 @@ export const addQuestion = async (
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
-    const imageUrls = questionData.imageUrls?.join(',') || '';
     
     // Get current row count
     const response = await sheetsClient.spreadsheets.values.get({
@@ -371,18 +472,46 @@ export const addQuestion = async (
     });
     const rowCount = (response.data.values?.length || 1) + 1;
 
-    await sheetsClient.spreadsheets.values.append({
+    // Split all text fields into chunks if they exceed 50,000 characters
+    const questionChunks = splitTextIntoChunks(questionData.question || '');
+    const answerChunks = splitTextIntoChunks(questionData.answer || '');
+    // Use ||| as delimiter to avoid conflicts with base64 data URLs which contain commas
+    const imageUrlsString = questionData.imageUrls?.join('|||') || '';
+    const imageUrlsChunks = splitTextIntoChunks(imageUrlsString);
+    const firstImage = questionData.imageUrls?.[0] || '';
+    const firstImageChunks = splitTextIntoChunks(firstImage);
+
+    // Build the row array: [Serial, Q1, A1, Images1, FirstImage1, Q2, A2, Images2, FirstImage2, ...]
+    // Structure: A=Serial, B=Q1, C=A1, D=Images1, E=FirstImage1, F=Q2, G=A2, H=Images2, I=FirstImage2, ...
+    const rowData: any[] = [
+      rowCount - 1, // Serial number (A)
+    ];
+
+    // Add chunks in groups: [Q, A, Images, FirstImage] for each chunk index
+    const maxChunks = Math.max(
+      questionChunks.length,
+      answerChunks.length,
+      imageUrlsChunks.length,
+      firstImageChunks.length
+    );
+
+    for (let i = 0; i < maxChunks; i++) {
+      rowData.push(questionChunks[i] || ''); // Question chunk
+      rowData.push(answerChunks[i] || ''); // Answer chunk
+      rowData.push(imageUrlsChunks[i] || ''); // Image URLs chunk
+      rowData.push(firstImageChunks[i] || ''); // First image chunk
+    }
+
+    // Determine the end column based on how many chunks we have
+    const endColumn = getColumnLetter(rowData.length - 1);
+    const range = `${technologyName}!A${rowCount}:${endColumn}${rowCount}`;
+
+    await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
-      range: `${technologyName}!A${rowCount}`,
+      range,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [[
-          rowCount - 1,
-          questionData.question,
-          questionData.answer,
-          imageUrls,
-          questionData.imageUrls?.[0] || '',
-        ]],
+        values: [rowData],
       },
     });
     return true;
@@ -394,6 +523,8 @@ export const addQuestion = async (
 
 /**
  * Update a question
+ * Splits long text across multiple cells to handle Google Sheets 50,000 character limit
+ * No validation - automatically handles unlimited characters by chunking
  */
 export const updateQuestion = async (
   technologyName: string,
@@ -402,21 +533,63 @@ export const updateQuestion = async (
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
-    const imageUrls = questionData.imageUrls?.join(',') || '';
     const actualRow = rowIndex + 2; // +2 for header and 0-indexing
+
+    // Split all text fields into chunks if they exceed 50,000 characters
+    const questionChunks = splitTextIntoChunks(questionData.question || '');
+    const answerChunks = splitTextIntoChunks(questionData.answer || '');
+    // Use ||| as delimiter to avoid conflicts with base64 data URLs which contain commas
+    const imageUrlsString = questionData.imageUrls?.join('|||') || '';
+    const imageUrlsChunks = splitTextIntoChunks(imageUrlsString);
+    const firstImage = questionData.imageUrls?.[0] || '';
+    const firstImageChunks = splitTextIntoChunks(firstImage);
+
+    // Build the row array: [Serial, Q1, A1, Images1, FirstImage1, Q2, A2, Images2, FirstImage2, ...]
+    const rowData: any[] = [
+      rowIndex + 1, // Serial number (A)
+    ];
+
+    // Add chunks in groups: [Q, A, Images, FirstImage] for each chunk index
+    const maxChunks = Math.max(
+      questionChunks.length,
+      answerChunks.length,
+      imageUrlsChunks.length,
+      firstImageChunks.length
+    );
+
+    for (let i = 0; i < maxChunks; i++) {
+      rowData.push(questionChunks[i] || ''); // Question chunk
+      rowData.push(answerChunks[i] || ''); // Answer chunk
+      rowData.push(imageUrlsChunks[i] || ''); // Image URLs chunk
+      rowData.push(firstImageChunks[i] || ''); // First image chunk
+    }
+
+    // First, read current row to see how many columns are used (to clear old data if needed)
+    const currentRowResponse = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      range: `${technologyName}!A${actualRow}:ZZ${actualRow}`,
+    });
+    const currentRow = currentRowResponse.data.values?.[0] || [];
+    const maxCurrentCol = currentRow.length;
+
+    // Determine the end column based on how many chunks we have
+    const endColumnIndex = Math.max(maxCurrentCol, rowData.length);
+    const endColumn = getColumnLetter(endColumnIndex - 1);
+    const range = `${technologyName}!A${actualRow}:${endColumn}${actualRow}`;
+
+    // If we're writing fewer columns than exist, extend rowData with empty strings to clear old data
+    if (rowData.length < maxCurrentCol) {
+      while (rowData.length < maxCurrentCol) {
+        rowData.push('');
+      }
+    }
 
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
-      range: `${technologyName}!A${actualRow}:E${actualRow}`,
+      range,
       valueInputOption: 'RAW',
       requestBody: {
-        values: [[
-          rowIndex + 1,
-          questionData.question,
-          questionData.answer,
-          imageUrls,
-          questionData.imageUrls?.[0] || '',
-        ]],
+        values: [rowData],
       },
     });
     return true;
@@ -432,12 +605,14 @@ export const updateQuestion = async (
 export const deleteQuestion = async (
   technologyName: string,
   rowIndex: number,
-  sheetId: number
+  sheetId: number,
+  accessToken: string | null = null
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(accessToken);
     const actualRow = rowIndex + 2; // +2 for header and 0-indexing
 
+    // Delete the row
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
       requestBody: {
@@ -455,6 +630,27 @@ export const deleteQuestion = async (
         ],
       },
     });
+
+    // Update serial numbers for all remaining questions after deletion
+    const updatedQuestions = await getQuestions(technologyName, accessToken);
+    
+    // Build updates for serial numbers in column A
+    const updates = updatedQuestions.map((q, index) => ({
+      range: `${technologyName}!A${index + 2}`, // +2 for header and 1-based index
+      values: [[index + 1]], // Serial number
+    }));
+
+    // Batch update all serial numbers
+    if (updates.length > 0) {
+      await sheetsClient.spreadsheets.values.batchUpdate({
+        spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+        requestBody: {
+          valueInputOption: 'RAW',
+          data: updates,
+        },
+      });
+    }
+
     return true;
   } catch (error) {
     console.error('Error deleting question:', error);
@@ -472,10 +668,18 @@ export const reorderQuestions = async (
   sheetId: number
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
-    const actualOldRow = oldIndex + 2;
-    const actualNewRow = newIndex + 2;
+    // Handle no-op case
+    if (oldIndex === newIndex) {
+      return true;
+    }
 
+    const sheetsClient = getSheetsClient();
+    // Convert indices to actual row numbers (accounting for header row)
+    // In 0-based indexing: row 0 is header, row 1 is first data row
+    const oldRowNumber = oldIndex + 1; // +1 to account for header
+    const newRowNumber = newIndex + 1; // +1 to account for header
+
+    // Move the row
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
       requestBody: {
@@ -485,18 +689,40 @@ export const reorderQuestions = async (
               source: {
                 sheetId,
                 dimension: 'ROWS',
-                startIndex: actualOldRow - 1,
-                endIndex: actualOldRow,
+                startIndex: oldRowNumber,
+                endIndex: oldRowNumber + 1,
               },
-              destinationIndex: actualNewRow - 1,
+              destinationIndex: newRowNumber > oldRowNumber ? newRowNumber + 1 : newRowNumber,
             },
           },
         ],
       },
     });
+
+    // Update serial numbers for all questions after the move
+    const updatedQuestions = await getQuestions(technologyName);
+    
+    // Build updates for serial numbers in column A
+    const updates = updatedQuestions.map((q, index) => ({
+      range: `${technologyName}!A${index + 2}`, // +2 for header and 1-based index
+      values: [[index + 1]], // Serial number
+    }));
+
+    // Batch update all serial numbers
+    if (updates.length > 0) {
+      await sheetsClient.spreadsheets.values.batchUpdate({
+        spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+        requestBody: {
+          valueInputOption: 'RAW',
+          data: updates,
+        },
+      });
+    }
+
     return true;
   } catch (error) {
     console.error('Error reordering questions:', error);
+   
     return false;
   }
 };
@@ -625,6 +851,7 @@ export const reorderProjects = async (
     const actualOldRow = oldIndex + 2;
     const actualNewRow = newIndex + 2;
 
+    // Move the row
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.PROJECT_LISTING,
       requestBody: {
@@ -643,6 +870,27 @@ export const reorderProjects = async (
         ],
       },
     });
+
+    // Update serial numbers for all projects after the move
+    const updatedProjects = await getProjects();
+    
+    // Build updates for serial numbers in column A
+    const updates = updatedProjects.map((p, index) => ({
+      range: `Project List!A${index + 2}`, // +2 for header and 1-based index
+      values: [[index + 1]], // Serial number
+    }));
+
+    // Batch update all serial numbers
+    if (updates.length > 0) {
+      await sheetsClient.spreadsheets.values.batchUpdate({
+        spreadsheetId: SPREADSHEET_IDS.PROJECT_LISTING,
+        requestBody: {
+          valueInputOption: 'RAW',
+          data: updates,
+        },
+      });
+    }
+
     return true;
   } catch (error) {
     console.error('Error reordering projects:', error);

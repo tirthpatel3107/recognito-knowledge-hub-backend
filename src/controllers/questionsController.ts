@@ -94,11 +94,12 @@ export const deleteQuestionHandler = asyncHandler(async (req: Request, res: Resp
   const success = await deleteQuestion(
     technologyName,
     parseInt(rowIndex),
-    tech.sheetId
+    tech.sheetId,
+    req.googleToken!
   );
 
   if (success) {
-    return sendSuccess(res, null, 'Question deleted successfully');
+    return sendSuccess(res, null, 'Question and associated images deleted successfully');
   } else {
     return sendError(res, 'Failed to delete question', 500);
   }
@@ -142,4 +143,5 @@ export const reorderQuestionsHandler = asyncHandler(async (req: Request, res: Re
     return sendError(res, 'Failed to reorder questions', 500);
   }
 });
+
 
