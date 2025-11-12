@@ -67,6 +67,16 @@ export interface ColorPalette {
   darkModeColor: string | null;
 }
 
+export interface Tag {
+  id: string;
+  no: string;
+  name: string;
+}
+
+export interface TagInput {
+  name: string;
+}
+
 export interface SpreadsheetValuesResponse {
   values?: string[][];
 }

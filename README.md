@@ -36,46 +36,46 @@ npm run dev
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/login` - Login with email/password
-- `POST /api/auth/google/verify` - Verify Google OAuth token
+- `POST /auth/login` - Login with email/password
+- `POST /auth/google/verify` - Verify Google OAuth token
 
 ### Technologies
-- `GET /api/technologies` - Get all technologies
-- `POST /api/technologies` - Create technology (requires Google auth)
-- `PUT /api/technologies/:sheetId` - Update technology (requires Google auth)
-- `DELETE /api/technologies/:sheetId` - Delete technology (requires Google auth)
-- `POST /api/technologies/reorder` - Reorder technologies (requires Google auth)
+- `GET /technologies` - Get all technologies
+- `POST /technologies` - Create technology (requires Google auth)
+- `PUT /technologies/:sheetId` - Update technology (requires Google auth)
+- `DELETE /technologies/:sheetId` - Delete technology (requires Google auth)
+- `POST /technologies/reorder` - Reorder technologies (requires Google auth)
 
 ### Questions
-- `GET /api/questions/:technologyName` - Get questions for a technology
-- `POST /api/questions/:technologyName` - Add question (requires Google auth)
-- `PUT /api/questions/:technologyName/:rowIndex` - Update question (requires Google auth)
-- `DELETE /api/questions/:technologyName/:rowIndex` - Delete question (requires Google auth)
-- `POST /api/questions/:technologyName/reorder` - Reorder questions (requires Google auth)
+- `GET /questions/:technologyName` - Get questions for a technology
+- `POST /questions/:technologyName` - Add question (requires Google auth)
+- `PUT /questions/:technologyName/:rowIndex` - Update question (requires Google auth)
+- `DELETE /questions/:technologyName/:rowIndex` - Delete question (requires Google auth)
+- `POST /questions/:technologyName/reorder` - Reorder questions (requires Google auth)
 
 ### Projects
-- `GET /api/projects` - Get all projects
-- `POST /api/projects` - Add project (requires Google auth)
-- `PUT /api/projects/:rowIndex` - Update project (requires Google auth)
-- `DELETE /api/projects/:rowIndex` - Delete project (requires Google auth)
-- `POST /api/projects/reorder` - Reorder projects (requires Google auth)
+- `GET /projects` - Get all projects
+- `POST /projects` - Add project (requires Google auth)
+- `PUT /projects/:rowIndex` - Update project (requires Google auth)
+- `DELETE /projects/:rowIndex` - Delete project (requires Google auth)
+- `POST /projects/reorder` - Reorder projects (requires Google auth)
 
 ### Work Summary
-- `GET /api/work-summary/months` - Get all month sheets
-- `GET /api/work-summary/entries/:monthSheet` - Get entries for a month
-- `POST /api/work-summary/months` - Create month sheet (requires Google auth)
-- `POST /api/work-summary/entries` - Add work summary entry (requires Google auth)
-- `PUT /api/work-summary/entries/:monthSheet/:rowIndex` - Update entry (requires Google auth)
-- `DELETE /api/work-summary/entries/:monthSheet/:rowIndex` - Delete entry (requires Google auth)
+- `GET /work-summary/months` - Get all month sheets
+- `GET /work-summary/entries/:monthSheet` - Get entries for a month
+- `POST /work-summary/months` - Create month sheet (requires Google auth)
+- `POST /work-summary/entries` - Add work summary entry (requires Google auth)
+- `PUT /work-summary/entries/:monthSheet/:rowIndex` - Update entry (requires Google auth)
+- `DELETE /work-summary/entries/:monthSheet/:rowIndex` - Delete entry (requires Google auth)
 
 ### Practical Tasks
-- `GET /api/practical-tasks` - Get all practical tasks
+- `GET /practical-tasks` - Get all practical tasks
 
 ### User Preferences
-- `GET /api/user/dashboard-order` - Get dashboard card order
-- `POST /api/user/dashboard-order` - Save dashboard card order (requires Google auth)
-- `GET /api/user/mode` - Get user theme mode
-- `POST /api/user/mode` - Update user theme mode (requires Google auth)
+- `GET /user/dashboard-order` - Get dashboard card order
+- `POST /user/dashboard-order` - Save dashboard card order (requires Google auth)
+- `GET /user/mode` - Get user theme mode
+- `POST /user/mode` - Update user theme mode (requires Google auth)
 
 ## Authentication
 

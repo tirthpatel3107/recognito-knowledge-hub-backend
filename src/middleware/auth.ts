@@ -33,7 +33,7 @@ export const authenticateToken = (
   const jwtSecret = getJwtSecret();
 
   if (!jwtSecret) {
-    console.error('JWT secret is not configured in the Config sheet');
+    // JWT secret is not configured in the Config sheet
     res.status(500).json({ error: 'Server configuration error' });
     return;
   }
@@ -51,7 +51,7 @@ export const authenticateToken = (
     req.user = decoded;
     next();
   } catch (error: any) {
-    console.error('Token verification failed:', error.message);
+    // Token verification failed
     res.status(403).json({ error: 'Invalid or expired token' });
   }
 };

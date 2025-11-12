@@ -43,8 +43,7 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  // Log error
-  console.error('Error:', err);
+  // Error occurred - handled silently (error details in response)
 
   // Determine status code
   const statusCode = err instanceof AppError ? err.statusCode : 500;

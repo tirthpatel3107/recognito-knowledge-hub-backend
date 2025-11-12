@@ -17,12 +17,12 @@ const envPath = join(__dirname, '..', '.env');
 dotenv.config({ path: envPath });
 
 // Verify LOGIN_SPREADSHEET_ID is loaded
-if (!process.env.LOGIN_SPREADSHEET_ID) {
-  console.warn('⚠️  WARNING: LOGIN_SPREADSHEET_ID is not set in environment variables.');
-  console.warn(`   Looking for .env file at: ${envPath}`);
-  console.warn('   Please ensure .env file exists and contains LOGIN_SPREADSHEET_ID');
+if (!process.env?.LOGIN_SPREADSHEET_ID) {
+  // WARNING: LOGIN_SPREADSHEET_ID is not set in environment variables
+  // Looking for .env file at: {envPath}
+  // Please ensure .env file exists and contains LOGIN_SPREADSHEET_ID
 } else {
-  console.log('✅ LOGIN_SPREADSHEET_ID loaded from .env file');
+  // LOGIN_SPREADSHEET_ID loaded from .env file
 }
 
 // Import routes
@@ -34,6 +34,7 @@ import workSummaryRoutes from './routes/workSummary.js';
 import practicalTasksRoutes from './routes/practicalTasks.js';
 import practicalTaskTechnologiesRoutes from './routes/practicalTaskTechnologies.js';
 import userRoutes from './routes/user.js';
+import tagsRoutes from './routes/tags.js';
 
 // Import services to initialize
 import { initializeGoogleSheets } from './services/googleSheetsService.js';
@@ -51,9 +52,9 @@ initializeGoogleSheets();
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
 
-  // Log CORS requests for debugging
+  // CORS requests tracking (no logging in production)
   if (req.method === 'OPTIONS' || req.method === 'POST') {
-    console.log(`[CORS] ${req.method} request from origin: ${origin || 'none'}`);
+    // CORS request from origin: {origin || 'none'}
   }
 
   // Handle preflight OPTIONS requests
@@ -72,7 +73,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       'Content-Type, Authorization, X-Google-Token, X-Requested-With, Accept, Cache-Control, Pragma, Expires'
     );
     res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
-    console.log(`[CORS] ✓ Preflight approved for origin: ${origin || 'all'}`);
+    // CORS preflight approved for origin: {origin || 'all'}
     return res.status(200).end();
   }
 
@@ -118,6 +119,7 @@ app.use('/api/work-summary', workSummaryRoutes);
 app.use('/api/practical-tasks', practicalTasksRoutes);
 app.use('/api/practical-task-technologies', practicalTaskTechnologiesRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/tags', tagsRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -129,6 +131,6 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  // Server is running on http://localhost:{PORT}
 });
 

@@ -31,7 +31,7 @@ export const serviceWrapper = <T extends (...args: any[]) => Promise<any>>(
 ): T => {
   return ((...args: Parameters<T>) => {
     return fn(...args).catch((error: Error) => {
-      console.error(`Error in service function ${fn.name}:`, error);
+      // Error in service function
       throw error;
     });
   }) as T;

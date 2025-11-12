@@ -103,7 +103,7 @@ export const verifyGoogleToken = asyncHandler(async (req: Request, res: Response
 
     if (!userInfoResponse.ok) {
       const errorText = await userInfoResponse.text();
-      console.error('Google userinfo API error:', errorText);
+      // Google userinfo API error
       return sendError(res, 'Invalid Google access token', 401);
     }
 
@@ -120,8 +120,8 @@ export const verifyGoogleToken = asyncHandler(async (req: Request, res: Response
         { expected: expectedEmail, received: googleEmail }
       );
     }
-  } catch (tokenError) {
-    console.error('Error verifying Google token:', tokenError);
+  } catch {
+    // Error verifying Google token
     return sendError(res, 'Invalid Google access token', 401);
   }
 
@@ -129,9 +129,8 @@ export const verifyGoogleToken = asyncHandler(async (req: Request, res: Response
   try {
     await loadConfigFromSheet(accessToken);
     initializeGoogleSheets();
-  } catch (configError) {
-    console.error('Error loading config from sheet:', configError);
-    // Continue even if config loading fails
+  } catch {
+    // Error loading config from sheet - continue even if config loading fails
   }
 
   // Store the token for future use
@@ -141,17 +140,16 @@ export const verifyGoogleToken = asyncHandler(async (req: Request, res: Response
   // Set user credentials for Google Sheets API
   try {
     setUserCredentials(accessToken);
-  } catch (credError) {
-    console.warn('Could not set user credentials (config may not be loaded):', credError);
+  } catch {
+    // Could not set user credentials (config may not be loaded)
   }
 
   // Try to update user photo (optional, don't fail if this errors)
   if (googlePhoto) {
     try {
       await updateUserPhotoFromGoogle(googleEmail, googlePhoto, accessToken);
-    } catch (photoError) {
-      console.error('Error saving Google photo to sheet:', photoError);
-      // Don't fail the request if photo update fails
+    } catch {
+      // Error saving Google photo to sheet - don't fail the request if photo update fails
     }
   }
 

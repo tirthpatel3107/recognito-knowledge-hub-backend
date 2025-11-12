@@ -43,7 +43,7 @@ const getProjectListSheetId = async (accessToken: string | null = null): Promise
     const sheetsClient = buildSheetsClient(accessToken);
 
     if (!SPREADSHEET_IDS.WORK_SUMMARY) {
-      console.error('WORK_SUMMARY spreadsheet ID is not configured');
+      // WORK_SUMMARY spreadsheet ID is not configured
       return { availableSheets: [] };
     }
 
@@ -54,8 +54,7 @@ const getProjectListSheetId = async (accessToken: string | null = null): Promise
     const sheetsList = response.data.sheets || [];
     const availableSheets = sheetsList.map((sheet: any) => sheet.properties?.title).filter(Boolean);
     
-    // Debug: Log all sheet titles to see what we're working with
-    console.log('Searching for Project List sheet. Available sheets:', availableSheets);
+    // Searching for Project List sheet
     
     // Try multiple search strategies
     let projectListSheet = null;
@@ -66,7 +65,7 @@ const getProjectListSheetId = async (accessToken: string | null = null): Promise
     );
     
     if (projectListSheet) {
-      console.log('Found Project List sheet using exact case-sensitive match');
+      // Found Project List sheet using exact case-sensitive match
     } else {
       // Strategy 2: Case-insensitive match with normalized whitespace
       projectListSheet = sheetsList.find(
@@ -78,7 +77,7 @@ const getProjectListSheetId = async (accessToken: string | null = null): Promise
       );
       
       if (projectListSheet) {
-        console.log('Found Project List sheet using normalized case-insensitive match');
+        // Found Project List sheet using normalized case-insensitive match
       } else {
         // Strategy 3: Partial match (contains both words)
         projectListSheet = sheetsList.find(
@@ -89,33 +88,26 @@ const getProjectListSheetId = async (accessToken: string | null = null): Promise
         );
         
         if (projectListSheet) {
-          console.log('Found Project List sheet using partial match');
+          // Found Project List sheet using partial match
         }
       }
     }
 
     if (!projectListSheet) {
-      const sheetsListStr = availableSheets.join(', ');
-      console.error('Project List sheet (tab) not found in WORK_SUMMARY spreadsheet.');
-      console.error('Available sheets (tabs):', sheetsListStr);
-      console.error('Sheet titles with details:', sheetsList.map((s: any) => ({
-        title: s.properties?.title,
-        titleLength: s.properties?.title?.length,
-        titleChars: s.properties?.title?.split('').map((c: string) => c.charCodeAt(0))
-      })));
+      // Project List sheet (tab) not found in WORK_SUMMARY spreadsheet
       return { availableSheets };
     }
 
     const sheetId = projectListSheet.properties?.sheetId;
     if (!sheetId) {
-      console.error('Project List sheet found but sheetId is missing');
+      // Project List sheet found but sheetId is missing
       return { availableSheets };
     }
 
-    console.log('Successfully found Project List sheet with ID:', sheetId);
+    // Successfully found Project List sheet
     return { sheetId, availableSheets };
-  } catch (error) {
-    console.error('Error getting Project List sheet ID:', error);
+  } catch {
+    // Error getting Project List sheet ID
     return { availableSheets: [] };
   }
 };

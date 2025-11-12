@@ -69,7 +69,7 @@ export const updateUserModeHandler = asyncHandler(async (req: Request, res: Resp
   const email = req.user!.email;
   let { mode } = req.body;
 
-  console.log('Updating user mode:', { email, mode, body: req.body });
+  // Updating user mode
 
   // Normalize mode to handle case-insensitive input
   if (mode && typeof mode === 'string') {
@@ -85,7 +85,7 @@ export const updateUserModeHandler = asyncHandler(async (req: Request, res: Resp
   if (success) {
     return sendSuccess(res, null, 'User mode updated successfully');
   } else {
-    console.error('updateUserMode returned false');
+    // updateUserMode returned false
     return sendError(
       res,
       'Failed to update user mode',
@@ -132,7 +132,7 @@ export const updateUserProfileHandler = asyncHandler(async (req: Request, res: R
       return sendError(res, 'Failed to update profile', 500);
     }
   } catch (error) {
-    console.error('Error in updateUserProfileHandler:', error);
+    // Error in updateUserProfileHandler
     const errorMessage = error instanceof Error ? error.message : 'Failed to update profile';
     return sendError(res, errorMessage, 500);
   }

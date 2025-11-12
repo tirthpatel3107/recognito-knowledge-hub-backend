@@ -4,7 +4,6 @@
  */
 import { google } from 'googleapis';
 import { GOOGLE_CONFIG, SPREADSHEET_IDS } from '../config/googleConfig';
-import { getGoogleToken } from './googleTokenStore';
 import type {
   Technology,
   Question,
@@ -16,6 +15,8 @@ import type {
   WorkSummaryEntryInput,
   UserProfile,
   ColorPalette,
+  Tag,
+  TagInput,
 } from '../types/googleSheets';
 
 // Global OAuth2 client instance
@@ -39,7 +40,7 @@ const getLoginSpreadsheetId = (): string => {
  */
 export const initializeGoogleSheets = (): void => {
   if (!GOOGLE_CONFIG.CLIENT_ID || !GOOGLE_CONFIG.CLIENT_SECRET) {
-    console.warn('Google Sheets service not fully initialized - missing OAuth credentials');
+    // Google Sheets service not fully initialized - missing OAuth credentials
     return;
   }
 
@@ -94,15 +95,15 @@ export const authenticateUser = async (
       range: 'UserDetail!A2:B100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     for (const row of rows) {
-      if (row.length >= 2 && row[0]?.toLowerCase() === email.toLowerCase() && row[1] === password) {
+      if (row?.length >= 2 && row[0]?.toLowerCase() === email.toLowerCase() && row[1] === password) {
         return true;
       }
     }
     return false;
   } catch (error) {
-    console.error('Authentication error:', error);
+    // Authentication error occurred
     return false;
   }
 };
@@ -123,7 +124,7 @@ export const updateUserPhotoFromGoogle = async (
       range: 'UserDetail!A2:D100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     let rowIndex = -1;
 
     for (let i = 0; i < rows.length; i++) {
@@ -134,7 +135,7 @@ export const updateUserPhotoFromGoogle = async (
     }
 
     if (rowIndex === -1) {
-      console.warn(`User ${email} not found in login spreadsheet`);
+      // User not found in login spreadsheet
       return false;
     }
 
@@ -149,11 +150,11 @@ export const updateUserPhotoFromGoogle = async (
 
     return true;
   } catch (error: any) {
-    console.error('Error updating user photo:', error);
-    if (error.message && error.message.includes('LOGIN_SPREADSHEET_ID is not configured')) {
-      console.error('LOGIN_SPREADSHEET_ID is not configured. Set it in the .env file.');
-    } else if (error.code === 404) {
-      console.error('Spreadsheet not found. Check LOGIN_SPREADSHEET_ID configuration.');
+    // Error updating user photo
+    if (error?.message && error.message.includes('LOGIN_SPREADSHEET_ID is not configured')) {
+      // LOGIN_SPREADSHEET_ID is not configured - set it in the .env file
+    } else if (error?.code === 404) {
+      // Spreadsheet not found - check LOGIN_SPREADSHEET_ID configuration
     }
     return false;
   }
@@ -169,7 +170,7 @@ export const getTechnologies = async (accessToken: string | null = null): Promis
     // Check if QUESTION_BANK spreadsheet ID is configured
     if (!SPREADSHEET_IDS.QUESTION_BANK || SPREADSHEET_IDS.QUESTION_BANK.trim() === '') {
       const errorMsg = 'QUESTION_BANK_SPREADSHEET_ID is not configured. Please authenticate to load configuration.';
-      console.error(errorMsg);
+      // Error: {errorMsg}
       throw new Error(errorMsg);
     }
 
@@ -178,14 +179,14 @@ export const getTechnologies = async (accessToken: string | null = null): Promis
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
     });
 
-    const sheets = response.data.sheets || [];
+    const sheets = response?.data?.sheets || [];
     return sheets.map((sheet: any, index: number) => ({
       id: `tech-${sheet.properties.sheetId}`,
       name: sheet.properties.title,
       sheetId: sheet.properties.sheetId,
     }));
   } catch (error: any) {
-    console.error('Error getting technologies:', error);
+    // Error getting technologies
     // Re-throw the error so the controller can handle it properly
     throw error;
   }
@@ -227,7 +228,7 @@ export const createTechnology = async (name: string): Promise<boolean> => {
 
     return true;
   } catch (error) {
-    console.error('Error creating technology:', error);
+    // Error creating technology
     return false;
   }
 };
@@ -260,7 +261,7 @@ export const updateTechnology = async (
     });
     return true;
   } catch (error) {
-    console.error('Error updating technology:', error);
+    // Error updating technology
     return false;
   }
 };
@@ -302,7 +303,7 @@ export const deleteTechnology = async (sheetId: number): Promise<{ success: bool
     });
     return { success: true };
   } catch (error: any) {
-    console.error('Error deleting technology:', error);
+    // Error deleting technology
     
     // Check for specific Google Sheets API error
     if (error?.message?.includes("You can't remove all the sheets")) {
@@ -341,7 +342,7 @@ export const reorderTechnologies = async (technologyIds: number[]): Promise<bool
     });
     return true;
   } catch (error) {
-    console.error('Error reordering technologies:', error);
+    // Error reordering technologies
     return false;
   }
 };
@@ -356,7 +357,7 @@ export const getPracticalTaskTechnologies = async (accessToken: string | null = 
     // Check if PRACTICAL_TASKS spreadsheet ID is configured
     if (!SPREADSHEET_IDS.PRACTICAL_TASKS || SPREADSHEET_IDS.PRACTICAL_TASKS.trim() === '') {
       const errorMsg = 'PRACTICAL_TASKS_SPREADSHEET_ID is not configured. Please authenticate to load configuration.';
-      console.error(errorMsg);
+      // Error: {errorMsg}
       throw new Error(errorMsg);
     }
 
@@ -365,14 +366,14 @@ export const getPracticalTaskTechnologies = async (accessToken: string | null = 
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
     });
 
-    const sheets = response.data.sheets || [];
+    const sheets = response?.data?.sheets || [];
     return sheets.map((sheet: any, index: number) => ({
       id: `tech-${sheet.properties.sheetId}`,
       name: sheet.properties.title,
       sheetId: sheet.properties.sheetId,
     }));
   } catch (error: any) {
-    console.error('Error getting practical task technologies:', error);
+    // Error getting practical task technologies
     // Re-throw the error so the controller can handle it properly
     throw error;
   }
@@ -414,7 +415,7 @@ export const createPracticalTaskTechnology = async (name: string): Promise<boole
 
     return true;
   } catch (error) {
-    console.error('Error creating practical task technology:', error);
+    // Error creating practical task technology
     return false;
   }
 };
@@ -447,7 +448,7 @@ export const updatePracticalTaskTechnology = async (
     });
     return true;
   } catch (error) {
-    console.error('Error updating practical task technology:', error);
+    // Error updating practical task technology
     return false;
   }
 };
@@ -489,7 +490,7 @@ export const deletePracticalTaskTechnology = async (sheetId: number): Promise<{ 
     });
     return { success: true };
   } catch (error: any) {
-    console.error('Error deleting practical task technology:', error);
+    // Error deleting practical task technology
     
     // Check for specific Google Sheets API error
     if (error?.message?.includes("You can't remove all the sheets")) {
@@ -528,7 +529,7 @@ export const reorderPracticalTaskTechnologies = async (technologyIds: number[]):
     });
     return true;
   } catch (error) {
-    console.error('Error reordering practical task technologies:', error);
+    // Error reordering practical task technologies
     return false;
   }
 };
@@ -612,10 +613,10 @@ const ensureQuestionBankHeaders = async (
           },
         });
       } catch (updateError) {
-        console.error('Error creating Question Bank headers:', updateError);
+        // Error creating Question Bank headers
       }
     } else {
-      console.error('Error checking Question Bank headers:', error);
+      // Error checking Question Bank headers
     }
   }
 };
@@ -640,7 +641,7 @@ export const getQuestions = async (
       range: `${technologyName}!A2:Z1000`,
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => {
       // Reconstruct question, answer, imageUrls, and firstImage from multiple columns
       // Each group is 4 columns: [Q, A, Images, FirstImage]
@@ -710,7 +711,7 @@ export const getQuestions = async (
       };
     });
   } catch (error) {
-    console.error('Error getting questions:', error);
+    // Error getting questions
     return [];
   }
 };
@@ -735,7 +736,7 @@ export const addQuestion = async (
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
       range: `${technologyName}!A:A`,
     });
-    const rowCount = (response.data.values?.length || 1) + 1;
+    const rowCount = (response?.data?.values?.length || 1) + 1;
 
     // Split all text fields into chunks if they exceed 50,000 characters
     const questionChunks = splitTextIntoChunks(questionData.question || '');
@@ -781,7 +782,7 @@ export const addQuestion = async (
     });
     return true;
   } catch (error) {
-    console.error('Error adding question:', error);
+    // Error adding question
     return false;
   }
 };
@@ -859,7 +860,7 @@ export const updateQuestion = async (
     });
     return true;
   } catch (error) {
-    console.error('Error updating question:', error);
+    // Error updating question
     return false;
   }
 };
@@ -918,7 +919,7 @@ export const deleteQuestion = async (
 
     return true;
   } catch (error) {
-    console.error('Error deleting question:', error);
+    // Error deleting question
     return false;
   }
 };
@@ -986,7 +987,7 @@ export const reorderQuestions = async (
 
     return true;
   } catch (error) {
-    console.error('Error reordering questions:', error);
+    // Error reordering questions
    
     return false;
   }
@@ -1008,7 +1009,7 @@ const findProjectListSheet = async (accessToken: string | null = null): Promise<
     const sheetsClient = getSheetsClient(accessToken);
     
     if (!SPREADSHEET_IDS.WORK_SUMMARY) {
-      console.error('WORK_SUMMARY spreadsheet ID is not configured');
+      // WORK_SUMMARY spreadsheet ID is not configured
       return { sheetName: 'Project List', availableSheets: [] };
     }
 
@@ -1022,7 +1023,7 @@ const findProjectListSheet = async (accessToken: string | null = null): Promise<
     // Case-insensitive search for "Project List" sheet (tab)
     // Normalize the search: remove all whitespace and convert to lowercase for comparison
     let projectListSheet = sheetsList.find(
-      (sheet) => {
+      (sheet:any) => {
         const title = sheet.properties?.title || '';
         // Remove all whitespace (spaces, tabs, etc.) and compare
         const normalized = title.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -1033,7 +1034,7 @@ const findProjectListSheet = async (accessToken: string | null = null): Promise<
     // If not found, try partial match (contains both "project" and "list" in any order)
     if (!projectListSheet) {
       projectListSheet = sheetsList.find(
-        (sheet) => {
+        (sheet:any) => {
           const title = (sheet.properties?.title || '').toLowerCase();
           // Check if title contains both words (in any order)
           return title.includes('project') && title.includes('list');
@@ -1044,7 +1045,7 @@ const findProjectListSheet = async (accessToken: string | null = null): Promise<
     // If still not found, try to find by exact name match (case-sensitive) from available sheets
     if (!projectListSheet) {
       projectListSheet = sheetsList.find(
-        (sheet) => {
+        (sheet:any) => {
           const title = sheet.properties?.title || '';
           return title === 'Project List';
         }
@@ -1053,8 +1054,7 @@ const findProjectListSheet = async (accessToken: string | null = null): Promise<
 
     if (!projectListSheet?.properties?.title) {
       const sheetsListStr = availableSheets.join(', ');
-      console.error('Project List sheet (tab) not found in WORK_SUMMARY spreadsheet.');
-      console.error('Available sheets (tabs):', sheetsListStr);
+      // Project List sheet (tab) not found in WORK_SUMMARY spreadsheet
       return { sheetName: 'Project List', availableSheets };
     }
 
@@ -1064,7 +1064,7 @@ const findProjectListSheet = async (accessToken: string | null = null): Promise<
       availableSheets
     };
   } catch (error) {
-    console.error('Error finding Project List sheet:', error);
+    // Error finding Project List sheet
     return { sheetName: 'Project List', availableSheets: [] };
   }
 };
@@ -1090,7 +1090,7 @@ export const getProjects = async (accessToken: string | null = null): Promise<Pr
       range: `${sheetName}!A2:C1000`,
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => ({
       id: `project-${index}`,
       no: row[0]?.toString() || '',
@@ -1098,7 +1098,7 @@ export const getProjects = async (accessToken: string | null = null): Promise<Pr
       projectId: row[2] || '',
     }));
   } catch (error) {
-    console.error('Error getting projects:', error);
+    // Error getting projects
     return [];
   }
 };
@@ -1114,7 +1114,7 @@ export const addProject = async (projectData: ProjectInput): Promise<boolean> =>
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
       range: `${sheetName}!A:A`,
     });
-    const rowCount = (response.data.values?.length || 1) + 1;
+    const rowCount = (response?.data?.values?.length || 1) + 1;
 
     await sheetsClient.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
@@ -1126,7 +1126,7 @@ export const addProject = async (projectData: ProjectInput): Promise<boolean> =>
     });
     return true;
   } catch (error) {
-    console.error('Error adding project:', error);
+    // Error adding project
     return false;
   }
 };
@@ -1153,7 +1153,7 @@ export const updateProject = async (
     });
     return true;
   } catch (error) {
-    console.error('Error updating project:', error);
+    // Error updating project
     return false;
   }
 };
@@ -1185,7 +1185,7 @@ export const deleteProject = async (rowIndex: number, sheetId: number): Promise<
     });
     return true;
   } catch (error) {
-    console.error('Error deleting project:', error);
+    // Error deleting project
     return false;
   }
 };
@@ -1246,7 +1246,278 @@ export const reorderProjects = async (
 
     return true;
   } catch (error) {
-    console.error('Error reordering projects:', error);
+    // Error reordering projects
+    return false;
+  }
+};
+
+// ==================== Tags ====================
+
+/**
+ * Ensure Tags sheet exists and has correct headers
+ */
+const ensureTagsSheet = async (accessToken: string | null = null): Promise<void> => {
+  try {
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+      // TAGS spreadsheet ID is not configured
+      return;
+    }
+
+    const sheetsClient = getSheetsClient(accessToken);
+    
+    // Check if Tags sheet exists
+    const spreadsheet = await sheetsClient.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+    });
+
+    const sheets = spreadsheet.data.sheets || [];
+    const tagsSheet = sheets.find((sheet: any) => 
+      sheet.properties?.title?.toLowerCase() === 'tags'
+    );
+
+    if (!tagsSheet) {
+      // Create Tags sheet
+      await sheetsClient.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_IDS.TAGS,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: 'Tags',
+                },
+              },
+            },
+          ],
+        },
+      });
+    }
+
+    // Check if headers exist
+    const headersResponse = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      range: 'Tags!A1:B1',
+    });
+
+    const headers = headersResponse?.data?.values?.[0] || [];
+    
+    if (headers.length === 0 || headers[0] !== 'No' || headers[1] !== 'Name') {
+      // Set headers
+      await sheetsClient.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_IDS.TAGS,
+        range: 'Tags!A1:B1',
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [['No', 'Name']],
+        },
+      });
+    }
+
+    // Ensure default "Daily" tag exists
+    // Check existing tags directly to avoid recursion
+    const tagsResponse = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      range: 'Tags!A2:B1000',
+    });
+    
+    const rows = tagsResponse?.data?.values || [];
+    const dailyTagExists = rows.some((row: any[]) => 
+      row[1]?.toLowerCase() === 'daily'
+    );
+    
+    if (!dailyTagExists) {
+      // Add default "Daily" tag
+      const rowCount = rows.length + 2; // +2 for header and 1-based index
+      await sheetsClient.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_IDS.TAGS,
+        range: `Tags!A${rowCount}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [[rows.length + 1, 'Daily']],
+        },
+      });
+    }
+  } catch (error) {
+    // Error ensuring Tags sheet
+  }
+};
+
+/**
+ * Get all tags
+ */
+export const getTags = async (accessToken: string | null = null): Promise<Tag[]> => {
+  try {
+    await ensureTagsSheet(accessToken);
+    const sheetsClient = getSheetsClient(accessToken);
+    
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+      // TAGS spreadsheet ID is not configured
+      return [];
+    }
+
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      range: 'Tags!A2:B1000',
+    });
+
+    const rows = response?.data?.values || [];
+    return rows.map((row: any[], index: number) => ({
+      id: `tag-${index}`,
+      no: row[0]?.toString() || '',
+      name: row[1] || '',
+    }));
+  } catch (error) {
+    // Error getting tags
+    return [];
+  }
+};
+
+/**
+ * Add a tag
+ */
+export const addTag = async (tagData: TagInput, accessToken: string | null = null): Promise<{ success: boolean; error?: string }> => {
+  try {
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+      // TAGS spreadsheet ID is not configured
+      const errorMsg = 'TAGS spreadsheet ID is not configured';
+      console.error(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    if (!accessToken) {
+      const errorMsg = 'Google access token is required';
+      console.error(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    await ensureTagsSheet(accessToken);
+    const sheetsClient = getSheetsClient(accessToken);
+
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      range: 'Tags!A:A',
+    });
+    const rowCount = (response?.data?.values?.length || 1) + 1;
+
+    await sheetsClient.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      range: `Tags!A${rowCount}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[rowCount - 1, tagData.name]],
+      },
+    });
+    return { success: true };
+  } catch (error: any) {
+    // Error adding tag
+    const errorMsg = error?.message || 'Unknown error occurred while adding tag';
+    console.error('Error adding tag:', error);
+    return { success: false, error: errorMsg };
+  }
+};
+
+/**
+ * Update a tag
+ */
+export const updateTag = async (
+  rowIndex: number,
+  tagData: TagInput,
+  accessToken: string | null = null
+): Promise<boolean> => {
+  try {
+    const sheetsClient = getSheetsClient(accessToken);
+    
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+      // TAGS spreadsheet ID is not configured
+      console.error('TAGS spreadsheet ID is not configured');
+      return false;
+    }
+
+    const actualRow = rowIndex + 2;
+
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      range: `Tags!A${actualRow}:B${actualRow}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[rowIndex + 1, tagData.name]],
+      },
+    });
+    return true;
+  } catch (error) {
+    // Error updating tag
+    console.error('Error updating tag:', error);
+    return false;
+  }
+};
+
+/**
+ * Delete a tag
+ */
+export const deleteTag = async (rowIndex: number, accessToken: string | null = null): Promise<boolean> => {
+  try {
+    const sheetsClient = getSheetsClient(accessToken);
+    
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+      // TAGS spreadsheet ID is not configured
+      return false;
+    }
+
+    // Get the sheet ID for Tags
+    const spreadsheet = await sheetsClient.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+    });
+
+    const sheets = spreadsheet.data.sheets || [];
+    const tagsSheet = sheets.find((sheet: any) => 
+      sheet.properties?.title?.toLowerCase() === 'tags'
+    );
+
+    if (!tagsSheet?.properties?.sheetId) {
+      return false;
+    }
+
+    const sheetId = tagsSheet.properties.sheetId;
+    const actualRow = rowIndex + 2;
+
+    await sheetsClient.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId,
+                dimension: 'ROWS',
+                startIndex: actualRow - 1,
+                endIndex: actualRow,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    // Update serial numbers for remaining tags
+    const updatedTags = await getTags();
+    const updates = updatedTags.map((tag, index) => ({
+      range: `Tags!A${index + 2}`,
+      values: [[index + 1]],
+    }));
+
+    if (updates.length > 0) {
+      await sheetsClient.spreadsheets.values.batchUpdate({
+        spreadsheetId: SPREADSHEET_IDS.TAGS,
+        requestBody: {
+          valueInputOption: 'RAW',
+          data: updates,
+        },
+      });
+    }
+
+    return true;
+  } catch (error) {
+    // Error deleting tag
     return false;
   }
 };
@@ -1265,7 +1536,7 @@ export const getWorkSummaryMonthSheets = async (
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
     });
 
-    const sheets = response.data.sheets || [];
+    const sheets = response?.data?.sheets || [];
     // Filter out Sheet1 and Project List (the project listing table) - case-insensitive
     return sheets
       .map((sheet: any) => sheet.properties.title)
@@ -1274,7 +1545,7 @@ export const getWorkSummaryMonthSheets = async (
         return lowerTitle !== 'sheet1' && lowerTitle !== 'project list';
       });
   } catch (error) {
-    console.error('Error getting month sheets:', error);
+    // Error getting month sheets
     return [];
   }
 };
@@ -1329,10 +1600,10 @@ const ensureWorkSummaryHeaders = async (
           },
         });
       } catch (updateError) {
-        console.error('Error creating Work Summary headers:', updateError);
+        // Error creating Work Summary headers
       }
     } else {
-      console.error('Error checking Work Summary headers:', error);
+      // Error checking Work Summary headers
     }
   }
 };
@@ -1354,7 +1625,7 @@ export const getWorkSummaryEntriesByMonth = async (
       range: `${monthSheet}!A2:E1000`,
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => ({
       id: `ws-${index}`,
       no: row[0]?.toString() || '',
@@ -1363,7 +1634,7 @@ export const getWorkSummaryEntriesByMonth = async (
       date: parseDateFromGoogleSheets(row[3] || ''), // Convert date from DD MMM YYYY to YYYY-MM-DD
     }));
   } catch (error) {
-    console.error('Error getting work summary entries:', error);
+    // Error getting work summary entries
     return [];
   }
 };
@@ -1409,7 +1680,7 @@ const reorderWorkSummarySheets = async (
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
     });
 
-    const sheets = response.data.sheets || [];
+    const sheets = response?.data?.sheets || [];
     
     // Categorize sheets
     const projectListSheet = sheets.find((sheet: any) => {
@@ -1489,7 +1760,7 @@ const reorderWorkSummarySheets = async (
 
     return true;
   } catch (error) {
-    console.error('Error reordering Work Summary sheets:', error);
+    // Error reordering Work Summary sheets
     return false;
   }
 };
@@ -1533,7 +1804,7 @@ export const createWorkSummaryMonthSheet = async (monthName: string): Promise<bo
 
     return true;
   } catch (error) {
-    console.error('Error creating month sheet:', error);
+    // Error creating month sheet
     return false;
   }
 };
@@ -1689,7 +1960,7 @@ export const addWorkSummaryEntry = async (
     const targetSheet = sheets.find((sheet: any) => sheet.properties.title === monthSheet);
     
     if (!targetSheet) {
-      console.error(`Sheet ${monthSheet} not found`);
+      // Sheet not found
       return false;
     }
     
@@ -1807,7 +2078,7 @@ export const addWorkSummaryEntry = async (
     
     return true;
   } catch (error) {
-    console.error('Error adding work summary entry:', error);
+    // Error adding work summary entry
     return false;
   }
 };
@@ -1832,7 +2103,7 @@ export const updateWorkSummaryEntry = async (
     const targetSheet = sheets.find((sheet: any) => sheet.properties.title === monthSheet);
     
     if (!targetSheet) {
-      console.error(`Sheet ${monthSheet} not found`);
+      // Sheet not found
       return false;
     }
     
@@ -1872,7 +2143,7 @@ export const updateWorkSummaryEntry = async (
     
     return true;
   } catch (error) {
-    console.error('Error updating work summary entry:', error);
+    // Error updating work summary entry
     return false;
   }
 };
@@ -1908,7 +2179,7 @@ export const deleteWorkSummaryEntry = async (
     });
     return true;
   } catch (error) {
-    console.error('Error deleting work summary entry:', error);
+    // Error deleting work summary entry
     return false;
   }
 };
@@ -1927,7 +2198,7 @@ export const getMonthNameFromDate = (dateString: string): string | null => {
     const year = date.getFullYear().toString().slice(-2);
     return `${month} ${year}`;
   } catch (error) {
-    console.error('Error parsing date:', error);
+    // Error parsing date
     return null;
   }
 };
@@ -1947,7 +2218,7 @@ export const getPracticalTasks = async (
       range: 'UserDetail!A2:E1000',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => ({
       id: `pt-${index}`,
       no: row[0]?.toString() || '',
@@ -1956,7 +2227,7 @@ export const getPracticalTasks = async (
       image: row[3] || '',
     }));
   } catch (error) {
-    console.error('Error getting practical tasks:', error);
+    // Error getting practical tasks
     return [];
   }
 };
@@ -2007,7 +2278,7 @@ export const getPracticalTasksByTechnology = async (
       range: `${technologyName}!A2:Z1000`,
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => {
       // Handle chunked data similar to questions
       let question = '';
@@ -2034,7 +2305,7 @@ export const getPracticalTasksByTechnology = async (
       // Sheet doesn't exist yet, return empty array
       return [];
     }
-    console.error('Error getting practical tasks by technology:', error);
+    // Error getting practical tasks by technology
     return [];
   }
 };
@@ -2058,7 +2329,7 @@ export const addPracticalTask = async (
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
       range: `${technologyName}!A:A`,
     });
-    const rowCount = (response.data.values?.length || 1) + 1;
+    const rowCount = (response?.data?.values?.length || 1) + 1;
 
     // Split all text fields into chunks if they exceed 50,000 characters
     const questionChunks = splitTextIntoChunks(taskData.question || '');
@@ -2097,7 +2368,7 @@ export const addPracticalTask = async (
     });
     return true;
   } catch (error) {
-    console.error('Error adding practical task:', error);
+    // Error adding practical task
     return false;
   }
 };
@@ -2152,7 +2423,7 @@ export const updatePracticalTask = async (
     });
     return true;
   } catch (error) {
-    console.error('Error updating practical task:', error);
+    // Error updating practical task
     return false;
   }
 };
@@ -2177,7 +2448,7 @@ export const deletePracticalTask = async (
       (s: any) => s.properties.title === technologyName
     );
     if (!sheet) {
-      console.error(`Sheet ${technologyName} not found`);
+      // Sheet not found
       return false;
     }
     const sheetId = sheet.properties.sheetId;
@@ -2206,7 +2477,7 @@ export const deletePracticalTask = async (
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
       range: `${technologyName}!A2:Z1000`,
     });
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     
     if (rows.length > 0) {
       const updateRequests = rows.map((row: any[], index: number) => {
@@ -2228,7 +2499,7 @@ export const deletePracticalTask = async (
 
     return true;
   } catch (error) {
-    console.error('Error deleting practical task:', error);
+    // Error deleting practical task
     return false;
   }
 };
@@ -2257,7 +2528,7 @@ export const reorderPracticalTasks = async (
       (s: any) => s.properties.title === technologyName
     );
     if (!sheet) {
-      console.error(`Sheet ${technologyName} not found`);
+      // Sheet not found
       return false;
     }
     const sheetId = sheet.properties.sheetId;
@@ -2309,7 +2580,7 @@ export const reorderPracticalTasks = async (
 
     return true;
   } catch (error) {
-    console.error('Error reordering practical tasks:', error);
+    // Error reordering practical tasks
     return false;
   }
 };
@@ -2331,7 +2602,7 @@ export const getDashboardCardOrder = async (
       range: 'DashboardOrder!A:Z',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     
     // Find the row for the current user's email
     for (const row of rows) {
@@ -2344,7 +2615,7 @@ export const getDashboardCardOrder = async (
     // Return empty array if user not found (will use default order)
     return [];
   } catch (error) {
-    console.error('Error getting dashboard card order:', error);
+    // Error getting dashboard card order
     return [];
   }
 };
@@ -2367,7 +2638,7 @@ export const saveDashboardCardOrder = async (
       range: 'DashboardOrder!A:Z',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     let rowIndex = -1;
 
     // Find the row for the current user's email
@@ -2404,7 +2675,7 @@ export const saveDashboardCardOrder = async (
 
     return true;
   } catch (error) {
-    console.error('Error saving dashboard card order:', error);
+    // Error saving dashboard card order
     return false;
   }
 };
@@ -2424,7 +2695,7 @@ export const getUserMode = async (
       range: 'UserDetail!A2:E100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     for (const row of rows) {
       if (row[0]?.toLowerCase() === email.toLowerCase()) {
         return row[4] || 'Light'; // Assuming mode is in column E
@@ -2432,7 +2703,7 @@ export const getUserMode = async (
     }
     return 'Light';
   } catch (error) {
-    console.error('Error getting user mode:', error);
+    // Error getting user mode
     return 'Light';
   }
 };
@@ -2449,7 +2720,7 @@ export const updateUserMode = async (email: string, mode: string): Promise<boole
       range: 'UserDetail!A2:E100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     let rowIndex = -1;
 
     for (let i = 0; i < rows.length; i++) {
@@ -2473,7 +2744,7 @@ export const updateUserMode = async (email: string, mode: string): Promise<boole
     });
     return true;
   } catch (error) {
-    console.error('Error updating user mode:', error);
+    // Error updating user mode
     return false;
   }
 };
@@ -2493,7 +2764,7 @@ export const getUserProfile = async (
       range: 'UserDetail!A2:D100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     for (const row of rows) {
       if (row[0]?.toLowerCase() === email.toLowerCase()) {
         return {
@@ -2506,7 +2777,7 @@ export const getUserProfile = async (
     }
     return null;
   } catch (error) {
-    console.error('Error getting user profile:', error);
+    // Error getting user profile
     return null;
   }
 };
@@ -2528,7 +2799,7 @@ export const updateUserProfile = async (
       range: 'UserDetail!A2:D100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     let rowIndex = -1;
 
     for (let i = 0; i < rows.length; i++) {
@@ -2539,13 +2810,13 @@ export const updateUserProfile = async (
     }
 
     if (rowIndex === -1) {
-      console.error('User not found in UserDetail sheet:', email);
+      // User not found in UserDetail sheet
       return false;
     }
 
     // Validate photo size (Google Sheets cell limit is 50,000 characters)
     if (photo !== undefined && photo !== null && photo.length > 50000) {
-      console.error('Photo data too large:', photo.length, 'characters (max 50,000)');
+      // Photo data too large (max 50,000 characters)
       throw new Error('Photo is too large. Please use a smaller image (max size: ~37KB when base64 encoded)');
     }
 
@@ -2571,11 +2842,11 @@ export const updateUserProfile = async (
           data: updates,
         },
       });
-      console.log('Profile updated successfully for user:', email);
+      // Profile updated successfully
     }
     return true;
   } catch (error) {
-    console.error('Error updating user profile:', error);
+    // Error updating user profile
     if (error instanceof Error) {
       throw error; // Re-throw to pass error message to caller
     }
@@ -2599,7 +2870,7 @@ export const updateUserPassword = async (
       range: 'UserDetail!A2:B100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     let rowIndex = -1;
 
     for (let i = 0; i < rows.length; i++) {
@@ -2626,7 +2897,7 @@ export const updateUserPassword = async (
     });
     return true;
   } catch (error) {
-    console.error('Error updating password:', error);
+    // Error updating password
     throw error;
   }
 };
@@ -2646,7 +2917,7 @@ export const getUserColorPalette = async (
       range: 'UserDetail!A2:G100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     for (const row of rows) {
       if (row[0]?.toLowerCase() === email.toLowerCase()) {
         // Convert empty strings to null
@@ -2663,7 +2934,7 @@ export const getUserColorPalette = async (
       darkModeColor: null,
     };
   } catch (error) {
-    console.error('Error getting color palette:', error);
+    // Error getting color palette
     return {
       lightModeColor: null,
       darkModeColor: null,
@@ -2688,7 +2959,7 @@ export const updateUserColorPalette = async (
       range: 'UserDetail!A2:G100',
     });
 
-    const rows = response.data.values || [];
+    const rows = response?.data?.values || [];
     let rowIndex = -1;
 
     for (let i = 0; i < rows.length; i++) {
@@ -2699,7 +2970,7 @@ export const updateUserColorPalette = async (
     }
 
     if (rowIndex === -1) {
-      console.error('User not found in UserDetail sheet');
+      // User not found in UserDetail sheet
       return false;
     }
 
@@ -2719,7 +2990,7 @@ export const updateUserColorPalette = async (
 
     return true;
   } catch (error) {
-    console.error('Error updating color palette:', error);
+    // Error updating color palette
     return false;
   }
 };

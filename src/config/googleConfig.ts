@@ -23,10 +23,11 @@ export interface SpreadsheetIds {
   PRACTICAL_TASKS: string;
   WORK_SUMMARY: string;
   PROJECT_LISTING: string;
+  KANBAN_BOARD: string;
+  TAGS: string;
 }
 
 export interface DocIds {
-  TODO: string;
   CREDENTIAL: string;
   WORK_SUMMARY: string;
   PROJECT: string;
@@ -58,10 +59,11 @@ export const SPREADSHEET_IDS: SpreadsheetIds = {
   PRACTICAL_TASKS: '',
   WORK_SUMMARY: '',
   PROJECT_LISTING: '',
+  KANBAN_BOARD: '',
+  TAGS: '',
 };
 
 export const DOC_IDS: DocIds = {
-  TODO: '',
   CREDENTIAL: '',
   WORK_SUMMARY: '',
   PROJECT: '',
@@ -100,8 +102,16 @@ export const applySheetConfig = (configMap: Record<string, string> = {}): void =
     normalizedConfig.WORK_SUMMARY_SPREADSHEET_ID ?? SPREADSHEET_IDS.WORK_SUMMARY;
   SPREADSHEET_IDS.PROJECT_LISTING =
     normalizedConfig.PROJECT_LISTING_SPREADSHEET_ID ?? SPREADSHEET_IDS.PROJECT_LISTING;
+  SPREADSHEET_IDS.KANBAN_BOARD =
+    normalizedConfig.KANBAN_BOARD_SPREADSHEET_ID ?? SPREADSHEET_IDS.KANBAN_BOARD;
+  // TAGS defaults to KANBAN_BOARD if TAGS_SPREADSHEET_ID is not configured
+  // This allows the "Tag" tab to be in the same spreadsheet as the kanban board
+  const tagsSpreadsheetId = normalizedConfig.TAGS_SPREADSHEET_ID;
+  SPREADSHEET_IDS.TAGS =
+    (tagsSpreadsheetId && tagsSpreadsheetId.trim() !== '') 
+      ? tagsSpreadsheetId
+      : (SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.TAGS);
 
-  DOC_IDS.TODO = normalizedConfig.TODO_DOC_ID ?? DOC_IDS.TODO;
   DOC_IDS.CREDENTIAL = normalizedConfig.CREDENTIAL_DOC_ID ?? DOC_IDS.CREDENTIAL;
   DOC_IDS.WORK_SUMMARY = normalizedConfig.WORK_SUMMARY_DOC_ID ?? DOC_IDS.WORK_SUMMARY;
   DOC_IDS.PROJECT = normalizedConfig.PROJECT_DOC_ID ?? DOC_IDS.PROJECT;
