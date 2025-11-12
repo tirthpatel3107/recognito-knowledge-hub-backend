@@ -32,20 +32,17 @@ import questionsRoutes from './routes/questions.js';
 import projectsRoutes from './routes/projects.js';
 import workSummaryRoutes from './routes/workSummary.js';
 import practicalTasksRoutes from './routes/practicalTasks.js';
+import practicalTaskTechnologiesRoutes from './routes/practicalTaskTechnologies.js';
 import userRoutes from './routes/user.js';
 
 // Import services to initialize
 import { initializeGoogleSheets } from './services/googleSheetsService.js';
-import { getServiceConfigValue, loadPersistedConfig } from './config/googleConfig.js';
+import { getServiceConfigValue } from './config/googleConfig.js';
 import { errorHandler } from './utils/errorHandler.js';
 
 const app = express();
 
-// Load persisted config from disk first (so JWT_SECRET is available after restarts)
-await loadPersistedConfig();
-
 const PORT = Number(getServiceConfigValue('PORT')) || 3001;
-const NODE_ENV = getServiceConfigValue('NODE_ENV') || 'development';
 
 // Initialize Google Sheets service (will be refreshed after config loads)
 initializeGoogleSheets();
@@ -119,6 +116,7 @@ app.use('/api/questions', questionsRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/work-summary', workSummaryRoutes);
 app.use('/api/practical-tasks', practicalTasksRoutes);
+app.use('/api/practical-task-technologies', practicalTaskTechnologiesRoutes);
 app.use('/api/user', userRoutes);
 
 // 404 handler
@@ -132,6 +130,5 @@ app.use(errorHandler);
 // Start server
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`Environment: ${NODE_ENV}`);
 });
 

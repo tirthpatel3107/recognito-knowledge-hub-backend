@@ -3,9 +3,7 @@
  * The only environment variable read at runtime is LOGIN_SPREADSHEET_ID.
  */
 
-import { writeFile, readFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -38,15 +36,9 @@ export interface ServiceConfig {
   JWT_SECRET: string;
   FRONTEND_URL: string;
   PORT: number;
-  NODE_ENV: string;
   JWT_EXPIRES_IN: string;
 }
 
-interface PersistedConfig {
-  JWT_SECRET: string;
-  JWT_EXPIRES_IN: string;
-  savedAt: number;
-}
 
 export const GOOGLE_CONFIG: GoogleConfig = {
   API_KEY: '',
@@ -79,7 +71,6 @@ const SERVICE_CONFIG: ServiceConfig = {
   JWT_SECRET: '',
   FRONTEND_URL: 'http://localhost:5173',
   PORT: 3001,
-  NODE_ENV: 'development',
   JWT_EXPIRES_IN: '24h',
 };
 
@@ -129,16 +120,7 @@ export const applySheetConfig = (configMap: Record<string, string> = {}): void =
     }
   }
 
-  if (normalizedConfig.NODE_ENV) {
-    SERVICE_CONFIG.NODE_ENV = normalizedConfig.NODE_ENV;
-  }
-
   configLoaded = true;
-
-  // Persist critical config to disk so it survives server restarts
-  persistServiceConfig().catch((error) => {
-    console.warn('Failed to persist config after update:', error);
-  });
 };
 
 export const isConfigLoaded = (): boolean => configLoaded;
@@ -157,76 +139,4 @@ export const requireServiceConfigValue = (key: string): string | number => {
 };
 
 export const getAllServiceConfig = (): ServiceConfig => ({ ...SERVICE_CONFIG });
-
-// Config persistence to survive server restarts
-const CONFIG_CACHE_DIR = join(__dirname, '..', '..', '.config-cache');
-const CONFIG_CACHE_FILE = join(CONFIG_CACHE_DIR, 'service-config.json');
-
-/**
- * Save critical config values to disk so they persist across server restarts
- * Only saves non-sensitive service config (JWT_SECRET, JWT_EXPIRES_IN)
- */
-export const persistServiceConfig = async (): Promise<void> => {
-  try {
-    // Only persist critical config that's needed for token verification
-    const configToSave: PersistedConfig = {
-      JWT_SECRET: SERVICE_CONFIG.JWT_SECRET,
-      JWT_EXPIRES_IN: SERVICE_CONFIG.JWT_EXPIRES_IN,
-      savedAt: Date.now(),
-    };
-
-    // Skip if JWT_SECRET is empty (nothing to persist)
-    if (!configToSave.JWT_SECRET) {
-      return;
-    }
-
-    // Ensure cache directory exists
-    if (!existsSync(CONFIG_CACHE_DIR)) {
-      await mkdir(CONFIG_CACHE_DIR, { recursive: true });
-    }
-
-    // Write config to file
-    await writeFile(CONFIG_CACHE_FILE, JSON.stringify(configToSave, null, 2), 'utf-8');
-    console.log('✅ Service config persisted to disk');
-  } catch (error) {
-    // Don't throw - persistence is optional, just log the error
-    console.warn('⚠️  Failed to persist service config:', error instanceof Error ? error.message : String(error));
-  }
-};
-
-/**
- * Load persisted config from disk on server startup
- * This ensures JWT_SECRET is available even after server restarts
- */
-export const loadPersistedConfig = async (): Promise<boolean> => {
-  try {
-    if (!existsSync(CONFIG_CACHE_FILE)) {
-      return false;
-    }
-
-    const fileContent = await readFile(CONFIG_CACHE_FILE, 'utf-8');
-    const persisted: PersistedConfig = JSON.parse(fileContent);
-
-    // Validate persisted config
-    if (!persisted.JWT_SECRET || typeof persisted.JWT_SECRET !== 'string') {
-      console.warn('⚠️  Invalid persisted config, ignoring');
-      return false;
-    }
-
-    // Restore critical config values
-    SERVICE_CONFIG.JWT_SECRET = persisted.JWT_SECRET;
-    if (persisted.JWT_EXPIRES_IN) {
-      SERVICE_CONFIG.JWT_EXPIRES_IN = persisted.JWT_EXPIRES_IN;
-    }
-
-    const ageMinutes = Math.floor((Date.now() - (persisted.savedAt || 0)) / (1000 * 60));
-    console.log(`✅ Loaded persisted service config (saved ${ageMinutes} minutes ago)`);
-    configLoaded = true;
-    return true;
-  } catch (error) {
-    // Don't throw - if we can't load persisted config, we'll load from Google Sheets on next login
-    console.warn('⚠️  Failed to load persisted config:', error instanceof Error ? error.message : String(error));
-    return false;
-  }
-};
 

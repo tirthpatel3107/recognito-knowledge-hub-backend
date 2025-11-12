@@ -11,8 +11,6 @@ services:
     buildCommand: npm install
     startCommand: node src/index.js
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: PORT
         value: 10000
       # Add your other environment variables here or in the dashboard

@@ -15,13 +15,10 @@ import {
   getUserColorPalette,
   updateUserColorPalette,
 } from '../services/googleSheetsService';
-import { getServiceConfigValue } from '../config/googleConfig';
 import { getGoogleToken } from '../services/googleTokenStore';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sendSuccess, sendError, sendValidationError, sendUnauthorized } from '../utils/responseHelper';
 import { getGoogleTokenFromRequest } from '../utils/googleTokenHelper';
-
-const isDevelopment = () => (getServiceConfigValue('NODE_ENV') || 'development') === 'development';
 
 /**
  * Get dashboard card order
@@ -178,7 +175,7 @@ export const updateUserPasswordHandler = asyncHandler(async (req: Request, res: 
       res,
       errorMessage,
       statusCode,
-      { details: isDevelopment() ? error.stack : undefined }
+      { details: error.stack }
     );
   }
 });

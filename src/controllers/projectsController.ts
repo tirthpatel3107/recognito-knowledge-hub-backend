@@ -36,19 +36,88 @@ const buildSheetsClient = (accessToken: string | null = null) => {
 };
 
 // Helper to get sheet ID for "Project List" sheet
-const getProjectListSheetId = async (accessToken: string | null = null): Promise<number | undefined> => {
-  const sheetsClient = buildSheetsClient(accessToken);
+// Note: Project List sheet (tab) is inside the WORK_SUMMARY spreadsheet, not PROJECT_LISTING
+// This uses the same search logic as the service layer for consistency
+const getProjectListSheetId = async (accessToken: string | null = null): Promise<{ sheetId?: number; availableSheets?: string[] }> => {
+  try {
+    const sheetsClient = buildSheetsClient(accessToken);
 
-  const response = await sheetsClient.spreadsheets.get({
-    spreadsheetId: SPREADSHEET_IDS.PROJECT_LISTING,
-  });
+    if (!SPREADSHEET_IDS.WORK_SUMMARY) {
+      console.error('WORK_SUMMARY spreadsheet ID is not configured');
+      return { availableSheets: [] };
+    }
 
-  const sheetsList = response.data.sheets || [];
-  const projectListSheet = sheetsList.find(
-    (sheet) => sheet.properties?.title === 'Project List'
-  );
+    const response = await sheetsClient.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+    });
 
-  return projectListSheet?.properties?.sheetId ?? undefined;
+    const sheetsList = response.data.sheets || [];
+    const availableSheets = sheetsList.map((sheet: any) => sheet.properties?.title).filter(Boolean);
+    
+    // Debug: Log all sheet titles to see what we're working with
+    console.log('Searching for Project List sheet. Available sheets:', availableSheets);
+    
+    // Try multiple search strategies
+    let projectListSheet = null;
+    
+    // Strategy 1: Exact case-sensitive match
+    projectListSheet = sheetsList.find(
+      (sheet) => sheet.properties?.title === 'Project List'
+    );
+    
+    if (projectListSheet) {
+      console.log('Found Project List sheet using exact case-sensitive match');
+    } else {
+      // Strategy 2: Case-insensitive match with normalized whitespace
+      projectListSheet = sheetsList.find(
+        (sheet) => {
+          const title = sheet.properties?.title || '';
+          const normalized = title.replace(/\s+/g, ' ').trim().toLowerCase();
+          return normalized === 'project list';
+        }
+      );
+      
+      if (projectListSheet) {
+        console.log('Found Project List sheet using normalized case-insensitive match');
+      } else {
+        // Strategy 3: Partial match (contains both words)
+        projectListSheet = sheetsList.find(
+          (sheet) => {
+            const title = (sheet.properties?.title || '').toLowerCase();
+            return title.includes('project') && title.includes('list');
+          }
+        );
+        
+        if (projectListSheet) {
+          console.log('Found Project List sheet using partial match');
+        }
+      }
+    }
+
+    if (!projectListSheet) {
+      const sheetsListStr = availableSheets.join(', ');
+      console.error('Project List sheet (tab) not found in WORK_SUMMARY spreadsheet.');
+      console.error('Available sheets (tabs):', sheetsListStr);
+      console.error('Sheet titles with details:', sheetsList.map((s: any) => ({
+        title: s.properties?.title,
+        titleLength: s.properties?.title?.length,
+        titleChars: s.properties?.title?.split('').map((c: string) => c.charCodeAt(0))
+      })));
+      return { availableSheets };
+    }
+
+    const sheetId = projectListSheet.properties?.sheetId;
+    if (!sheetId) {
+      console.error('Project List sheet found but sheetId is missing');
+      return { availableSheets };
+    }
+
+    console.log('Successfully found Project List sheet with ID:', sheetId);
+    return { sheetId, availableSheets };
+  } catch (error) {
+    console.error('Error getting Project List sheet ID:', error);
+    return { availableSheets: [] };
+  }
 };
 
 /**
@@ -111,13 +180,17 @@ export const deleteProjectHandler = asyncHandler(async (req: Request, res: Respo
   setUserCredentials(req.googleToken!);
   const { rowIndex } = req.params;
 
-  const sheetId = await getProjectListSheetId(req.googleToken!);
+  const result = await getProjectListSheetId(req.googleToken!);
 
-  if (!sheetId) {
-    return sendNotFound(res, 'Project List sheet');
+  if (!result.sheetId) {
+    const availableSheets = result.availableSheets?.join(', ') || 'none';
+    return sendNotFound(
+      res,
+      `Project List sheet (tab) not found in Work Summary spreadsheet. Available sheets (tabs): ${availableSheets}. Please ensure the tab is named exactly "Project List".`
+    );
   }
 
-  const success = await deleteProject(parseInt(rowIndex), sheetId);
+  const success = await deleteProject(parseInt(rowIndex), result.sheetId);
 
   if (success) {
     return sendSuccess(res, null, 'Project deleted successfully');
@@ -142,13 +215,17 @@ export const reorderProjectsHandler = asyncHandler(async (req: Request, res: Res
     return sendValidationError(res, 'oldIndex and newIndex are required numbers');
   }
 
-  const sheetId = await getProjectListSheetId(req.googleToken!);
+  const result = await getProjectListSheetId(req.googleToken!);
 
-  if (!sheetId) {
-    return sendNotFound(res, 'Project List sheet');
+  if (!result.sheetId) {
+    const availableSheets = result.availableSheets?.join(', ') || 'none';
+    return sendNotFound(
+      res,
+      `Project List sheet (tab) not found in Work Summary spreadsheet. Available sheets (tabs): ${availableSheets}. Please ensure the tab is named exactly "Project List".`
+    );
   }
 
-  const success = await reorderProjects(oldIndex, newIndex, sheetId);
+  const success = await reorderProjects(oldIndex, newIndex, result.sheetId);
 
   if (success) {
     return sendSuccess(res, null, 'Projects reordered successfully');

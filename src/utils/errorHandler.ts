@@ -3,7 +3,6 @@
  * Centralized error handling and custom error classes
  */
 import { Request, Response, NextFunction } from 'express';
-import { getServiceConfigValue } from '../config/googleConfig';
 
 export class AppError extends Error {
   statusCode: number;
@@ -44,8 +43,6 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
-  const nodeEnv = getServiceConfigValue('NODE_ENV') || 'development';
-
   // Log error
   console.error('Error:', err);
 
@@ -58,8 +55,8 @@ export const errorHandler = (
     error: err.message || 'Internal server error',
   };
 
-  // Include stack trace in development
-  if (nodeEnv === 'development' && err.stack) {
+  // Include stack trace
+  if (err.stack) {
     errorResponse.stack = err.stack;
   }
 

@@ -97,8 +97,6 @@ Start the server:
 npm start
 ```
 
-Make sure to set `NODE_ENV=production` in your `.env` file.
-
 ## Deployment
 
 ### Deploying to Render.com
