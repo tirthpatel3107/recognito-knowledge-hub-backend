@@ -2,17 +2,21 @@
  * Tags Controller
  * Handles tag-related operations
  */
-import { Request, Response } from 'express';
+import { Request, Response } from "express";
 import {
   getTags,
   addTag,
   updateTag,
   deleteTag,
   setUserCredentials,
-} from '../services/googleSheetsService';
-import { asyncHandler } from '../utils/asyncHandler';
-import { sendSuccess, sendError, sendValidationError } from '../utils/responseHelper';
-import { getGoogleTokenFromRequest } from '../utils/googleTokenHelper';
+} from "../services/googleSheetsService";
+import { asyncHandler } from "../utils/asyncHandler";
+import {
+  sendSuccess,
+  sendError,
+  sendValidationError,
+} from "../utils/responseHelper";
+import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 /**
  * Get all tags
@@ -26,77 +30,86 @@ export const getAllTags = asyncHandler(async (req: Request, res: Response) => {
 /**
  * Add a tag
  */
-export const addTagHandler = asyncHandler(async (req: Request, res: Response) => {
-  const googleToken = getGoogleTokenFromRequest(req);
-  
-  if (!googleToken) {
-    return sendError(res, 'Google access token is required', 401);
-  }
+export const addTagHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const googleToken = getGoogleTokenFromRequest(req);
 
-  setUserCredentials(googleToken);
-  const { name } = req.body;
+    if (!googleToken) {
+      return sendError(res, "Google access token is required", 401);
+    }
 
-  if (!name || typeof name !== 'string' || name.trim() === '') {
-    return sendValidationError(res, 'Tag name is required');
-  }
+    setUserCredentials(googleToken);
+    const { name } = req.body;
 
-  const result = await addTag({ name: name.trim() }, googleToken);
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      return sendValidationError(res, "Tag name is required");
+    }
 
-  if (result.success) {
-    return sendSuccess(res, null, 'Tag added successfully');
-  } else {
-    return sendError(res, result.error || 'Failed to add tag', 500);
-  }
-});
+    const result = await addTag({ name: name.trim() }, googleToken);
+
+    if (result.success) {
+      return sendSuccess(res, null, "Tag added successfully");
+    } else {
+      return sendError(res, result.error || "Failed to add tag", 500);
+    }
+  },
+);
 
 /**
  * Update a tag
  */
-export const updateTagHandler = asyncHandler(async (req: Request, res: Response) => {
-  const googleToken = getGoogleTokenFromRequest(req);
-  
-  if (!googleToken) {
-    return sendError(res, 'Google access token is required', 401);
-  }
+export const updateTagHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const googleToken = getGoogleTokenFromRequest(req);
 
-  setUserCredentials(googleToken);
-  const { rowIndex } = req.params;
-  const { name } = req.body;
+    if (!googleToken) {
+      return sendError(res, "Google access token is required", 401);
+    }
 
-  if (!name || typeof name !== 'string' || name.trim() === '') {
-    return sendValidationError(res, 'Tag name is required');
-  }
+    setUserCredentials(googleToken);
+    const { rowIndex } = req.params;
+    const { name } = req.body;
 
-  const success = await updateTag(parseInt(rowIndex), {
-    name: name.trim(),
-  }, googleToken);
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      return sendValidationError(res, "Tag name is required");
+    }
 
-  if (success) {
-    return sendSuccess(res, null, 'Tag updated successfully');
-  } else {
-    return sendError(res, 'Failed to update tag', 500);
-  }
-});
+    const success = await updateTag(
+      parseInt(rowIndex),
+      {
+        name: name.trim(),
+      },
+      googleToken,
+    );
+
+    if (success) {
+      return sendSuccess(res, null, "Tag updated successfully");
+    } else {
+      return sendError(res, "Failed to update tag", 500);
+    }
+  },
+);
 
 /**
  * Delete a tag
  */
-export const deleteTagHandler = asyncHandler(async (req: Request, res: Response) => {
-  const googleToken = getGoogleTokenFromRequest(req);
-  
-  if (!googleToken) {
-    return sendError(res, 'Google access token is required', 401);
-  }
+export const deleteTagHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const googleToken = getGoogleTokenFromRequest(req);
 
-  setUserCredentials(googleToken);
-  const { rowIndex } = req.params;
+    if (!googleToken) {
+      return sendError(res, "Google access token is required", 401);
+    }
 
-  const success = await deleteTag(parseInt(rowIndex), googleToken);
+    setUserCredentials(googleToken);
+    const { rowIndex } = req.params;
 
-  if (success) {
-    return sendSuccess(res, null, 'Tag deleted successfully');
-  } else {
-    return sendError(res, 'Failed to delete tag', 500);
-  }
-});
+    const success = await deleteTag(parseInt(rowIndex), googleToken);
 
+    if (success) {
+      return sendSuccess(res, null, "Tag deleted successfully");
+    } else {
+      return sendError(res, "Failed to delete tag", 500);
+    }
+  },
+);

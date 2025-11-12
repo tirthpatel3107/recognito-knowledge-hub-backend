@@ -2,8 +2,8 @@
  * Google Sheets Service
  * Handles all interactions with Google Sheets API
  */
-import { google } from 'googleapis';
-import { GOOGLE_CONFIG, SPREADSHEET_IDS } from '../config/googleConfig';
+import { google } from "googleapis";
+import { GOOGLE_CONFIG, SPREADSHEET_IDS } from "../config/googleConfig";
 import type {
   Technology,
   Question,
@@ -17,10 +17,10 @@ import type {
   ColorPalette,
   Tag,
   TagInput,
-} from '../types/googleSheets';
+} from "../types/googleSheets";
 
 // Global OAuth2 client instance
-import type { OAuth2Client } from 'google-auth-library';
+import type { OAuth2Client } from "google-auth-library";
 let oauth2Client: OAuth2Client | null = null;
 let currentAccessToken: string | null = null;
 
@@ -29,8 +29,10 @@ let currentAccessToken: string | null = null;
  */
 const getLoginSpreadsheetId = (): string => {
   const id = SPREADSHEET_IDS.LOGIN || process.env.LOGIN_SPREADSHEET_ID;
-  if (!id || id.trim() === '') {
-    throw new Error('LOGIN_SPREADSHEET_ID is not configured. Set it in the .env file.');
+  if (!id || id.trim() === "") {
+    throw new Error(
+      "LOGIN_SPREADSHEET_ID is not configured. Set it in the .env file.",
+    );
   }
   return id;
 };
@@ -47,7 +49,7 @@ export const initializeGoogleSheets = (): void => {
   oauth2Client = new google.auth.OAuth2(
     GOOGLE_CONFIG.CLIENT_ID,
     GOOGLE_CONFIG.CLIENT_SECRET,
-    GOOGLE_CONFIG.REDIRECT_URI
+    GOOGLE_CONFIG.REDIRECT_URI,
   );
 };
 
@@ -66,17 +68,17 @@ export const setUserCredentials = (accessToken: string): void => {
  */
 const getSheetsClient = (accessToken: string | null = null): any => {
   const token = accessToken || currentAccessToken;
-  
+
   if (token && oauth2Client) {
     oauth2Client.setCredentials({ access_token: token });
-    return google.sheets({ version: 'v4', auth: oauth2Client });
+    return google.sheets({ version: "v4", auth: oauth2Client });
   }
 
   if (!GOOGLE_CONFIG.API_KEY) {
-    throw new Error('Google API key is not configured for read-only access');
+    throw new Error("Google API key is not configured for read-only access");
   }
 
-  return google.sheets({ version: 'v4', auth: GOOGLE_CONFIG.API_KEY });
+  return google.sheets({ version: "v4", auth: GOOGLE_CONFIG.API_KEY });
 };
 
 /**
@@ -85,19 +87,23 @@ const getSheetsClient = (accessToken: string | null = null): any => {
 export const authenticateUser = async (
   email: string,
   password: string,
-  accessToken: string
+  accessToken: string,
 ): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:B100',
+      range: "UserDetail!A2:B100",
     });
 
     const rows = response?.data?.values || [];
     for (const row of rows) {
-      if (row?.length >= 2 && row[0]?.toLowerCase() === email.toLowerCase() && row[1] === password) {
+      if (
+        row?.length >= 2 &&
+        row[0]?.toLowerCase() === email.toLowerCase() &&
+        row[1] === password
+      ) {
         return true;
       }
     }
@@ -114,14 +120,14 @@ export const authenticateUser = async (
 export const updateUserPhotoFromGoogle = async (
   email: string,
   photoUrl: string,
-  accessToken: string
+  accessToken: string,
 ): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:D100',
+      range: "UserDetail!A2:D100",
     });
 
     const rows = response?.data?.values || [];
@@ -142,7 +148,7 @@ export const updateUserPhotoFromGoogle = async (
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: loginSpreadsheetId,
       range: `UserDetail!D${rowIndex}`,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [[photoUrl]],
       },
@@ -151,7 +157,10 @@ export const updateUserPhotoFromGoogle = async (
     return true;
   } catch (error: any) {
     // Error updating user photo
-    if (error?.message && error.message.includes('LOGIN_SPREADSHEET_ID is not configured')) {
+    if (
+      error?.message &&
+      error.message.includes("LOGIN_SPREADSHEET_ID is not configured")
+    ) {
       // LOGIN_SPREADSHEET_ID is not configured - set it in the .env file
     } else if (error?.code === 404) {
       // Spreadsheet not found - check LOGIN_SPREADSHEET_ID configuration
@@ -165,11 +174,17 @@ export const updateUserPhotoFromGoogle = async (
 /**
  * Get all technologies
  */
-export const getTechnologies = async (accessToken: string | null = null): Promise<Technology[]> => {
+export const getTechnologies = async (
+  accessToken: string | null = null,
+): Promise<Technology[]> => {
   try {
     // Check if QUESTION_BANK spreadsheet ID is configured
-    if (!SPREADSHEET_IDS.QUESTION_BANK || SPREADSHEET_IDS.QUESTION_BANK.trim() === '') {
-      const errorMsg = 'QUESTION_BANK_SPREADSHEET_ID is not configured. Please authenticate to load configuration.';
+    if (
+      !SPREADSHEET_IDS.QUESTION_BANK ||
+      SPREADSHEET_IDS.QUESTION_BANK.trim() === ""
+    ) {
+      const errorMsg =
+        "QUESTION_BANK_SPREADSHEET_ID is not configured. Please authenticate to load configuration.";
       // Error: {errorMsg}
       throw new Error(errorMsg);
     }
@@ -214,14 +229,15 @@ export const createTechnology = async (name: string): Promise<boolean> => {
     });
 
     // Add header row to the new sheet
-    const newSheetId = response.data.replies?.[0]?.addSheet?.properties?.sheetId;
+    const newSheetId =
+      response.data.replies?.[0]?.addSheet?.properties?.sheetId;
     if (newSheetId !== undefined) {
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
         range: `${name}!A1:D1`,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         requestBody: {
-          values: [['No', 'Question', 'Answer', 'Image']],
+          values: [["No", "Question", "Answer", "Image"]],
         },
       });
     }
@@ -239,7 +255,7 @@ export const createTechnology = async (name: string): Promise<boolean> => {
 export const updateTechnology = async (
   oldName: string,
   newName: string,
-  sheetId: number
+  sheetId: number,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
@@ -253,7 +269,7 @@ export const updateTechnology = async (
                 sheetId,
                 title: newName,
               },
-              fields: 'title',
+              fields: "title",
             },
           },
         ],
@@ -269,25 +285,28 @@ export const updateTechnology = async (
 /**
  * Delete technology (sheet)
  */
-export const deleteTechnology = async (sheetId: number): Promise<{ success: boolean; error?: string }> => {
+export const deleteTechnology = async (
+  sheetId: number,
+): Promise<{ success: boolean; error?: string }> => {
   try {
     const sheetsClient = getSheetsClient();
-    
+
     // First, check how many sheets exist
     const spreadsheet = await sheetsClient.spreadsheets.get({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
     });
-    
+
     const sheets = spreadsheet.data.sheets || [];
-    
+
     // Google Sheets requires at least one sheet, so prevent deleting the last one
     if (sheets.length <= 1) {
       return {
         success: false,
-        error: "Cannot delete the last sheet. A spreadsheet must have at least one sheet."
+        error:
+          "Cannot delete the last sheet. A spreadsheet must have at least one sheet.",
       };
     }
-    
+
     // Proceed with deletion
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
@@ -304,18 +323,19 @@ export const deleteTechnology = async (sheetId: number): Promise<{ success: bool
     return { success: true };
   } catch (error: any) {
     // Error deleting technology
-    
+
     // Check for specific Google Sheets API error
     if (error?.message?.includes("You can't remove all the sheets")) {
       return {
         success: false,
-        error: "Cannot delete the last sheet. A spreadsheet must have at least one sheet."
+        error:
+          "Cannot delete the last sheet. A spreadsheet must have at least one sheet.",
       };
     }
-    
+
     return {
       success: false,
-      error: error?.message || 'Failed to delete technology'
+      error: error?.message || "Failed to delete technology",
     };
   }
 };
@@ -323,7 +343,9 @@ export const deleteTechnology = async (sheetId: number): Promise<{ success: bool
 /**
  * Reorder technologies
  */
-export const reorderTechnologies = async (technologyIds: number[]): Promise<boolean> => {
+export const reorderTechnologies = async (
+  technologyIds: number[],
+): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
     const requests = technologyIds.map((sheetId, index) => ({
@@ -332,7 +354,7 @@ export const reorderTechnologies = async (technologyIds: number[]): Promise<bool
           sheetId,
           index,
         },
-        fields: 'index',
+        fields: "index",
       },
     }));
 
@@ -352,11 +374,17 @@ export const reorderTechnologies = async (technologyIds: number[]): Promise<bool
 /**
  * Get all practical task technologies
  */
-export const getPracticalTaskTechnologies = async (accessToken: string | null = null): Promise<Technology[]> => {
+export const getPracticalTaskTechnologies = async (
+  accessToken: string | null = null,
+): Promise<Technology[]> => {
   try {
     // Check if PRACTICAL_TASKS spreadsheet ID is configured
-    if (!SPREADSHEET_IDS.PRACTICAL_TASKS || SPREADSHEET_IDS.PRACTICAL_TASKS.trim() === '') {
-      const errorMsg = 'PRACTICAL_TASKS_SPREADSHEET_ID is not configured. Please authenticate to load configuration.';
+    if (
+      !SPREADSHEET_IDS.PRACTICAL_TASKS ||
+      SPREADSHEET_IDS.PRACTICAL_TASKS.trim() === ""
+    ) {
+      const errorMsg =
+        "PRACTICAL_TASKS_SPREADSHEET_ID is not configured. Please authenticate to load configuration.";
       // Error: {errorMsg}
       throw new Error(errorMsg);
     }
@@ -382,7 +410,9 @@ export const getPracticalTaskTechnologies = async (accessToken: string | null = 
 /**
  * Create a new practical task technology (sheet)
  */
-export const createPracticalTaskTechnology = async (name: string): Promise<boolean> => {
+export const createPracticalTaskTechnology = async (
+  name: string,
+): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
     const response = await sheetsClient.spreadsheets.batchUpdate({
@@ -401,14 +431,15 @@ export const createPracticalTaskTechnology = async (name: string): Promise<boole
     });
 
     // Add header row to the new sheet
-    const newSheetId = response.data.replies?.[0]?.addSheet?.properties?.sheetId;
+    const newSheetId =
+      response.data.replies?.[0]?.addSheet?.properties?.sheetId;
     if (newSheetId !== undefined) {
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
         range: `${name}!A1:D1`,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         requestBody: {
-          values: [['No', 'Question', 'Answer', 'Image']],
+          values: [["No", "Question", "Answer", "Image"]],
         },
       });
     }
@@ -426,7 +457,7 @@ export const createPracticalTaskTechnology = async (name: string): Promise<boole
 export const updatePracticalTaskTechnology = async (
   oldName: string,
   newName: string,
-  sheetId: number
+  sheetId: number,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
@@ -440,7 +471,7 @@ export const updatePracticalTaskTechnology = async (
                 sheetId,
                 title: newName,
               },
-              fields: 'title',
+              fields: "title",
             },
           },
         ],
@@ -456,25 +487,28 @@ export const updatePracticalTaskTechnology = async (
 /**
  * Delete practical task technology (sheet)
  */
-export const deletePracticalTaskTechnology = async (sheetId: number): Promise<{ success: boolean; error?: string }> => {
+export const deletePracticalTaskTechnology = async (
+  sheetId: number,
+): Promise<{ success: boolean; error?: string }> => {
   try {
     const sheetsClient = getSheetsClient();
-    
+
     // First, check how many sheets exist
     const spreadsheet = await sheetsClient.spreadsheets.get({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
     });
-    
+
     const sheets = spreadsheet.data.sheets || [];
-    
+
     // Google Sheets requires at least one sheet, so prevent deleting the last one
     if (sheets.length <= 1) {
       return {
         success: false,
-        error: "Cannot delete the last sheet. A spreadsheet must have at least one sheet."
+        error:
+          "Cannot delete the last sheet. A spreadsheet must have at least one sheet.",
       };
     }
-    
+
     // Proceed with deletion
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
@@ -491,18 +525,19 @@ export const deletePracticalTaskTechnology = async (sheetId: number): Promise<{ 
     return { success: true };
   } catch (error: any) {
     // Error deleting practical task technology
-    
+
     // Check for specific Google Sheets API error
     if (error?.message?.includes("You can't remove all the sheets")) {
       return {
         success: false,
-        error: "Cannot delete the last sheet. A spreadsheet must have at least one sheet."
+        error:
+          "Cannot delete the last sheet. A spreadsheet must have at least one sheet.",
       };
     }
-    
+
     return {
       success: false,
-      error: error?.message || 'Failed to delete practical task technology'
+      error: error?.message || "Failed to delete practical task technology",
     };
   }
 };
@@ -510,7 +545,9 @@ export const deletePracticalTaskTechnology = async (sheetId: number): Promise<{ 
 /**
  * Reorder practical task technologies
  */
-export const reorderPracticalTaskTechnologies = async (technologyIds: number[]): Promise<boolean> => {
+export const reorderPracticalTaskTechnologies = async (
+  technologyIds: number[],
+): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
     const requests = technologyIds.map((sheetId, index) => ({
@@ -519,7 +556,7 @@ export const reorderPracticalTaskTechnologies = async (technologyIds: number[]):
           sheetId,
           index,
         },
-        fields: 'index',
+        fields: "index",
       },
     }));
 
@@ -539,7 +576,10 @@ export const reorderPracticalTaskTechnologies = async (technologyIds: number[]):
 /**
  * Split text into chunks of max 50,000 characters (Google Sheets cell limit)
  */
-const splitTextIntoChunks = (text: string, maxLength: number = 50000): string[] => {
+const splitTextIntoChunks = (
+  text: string,
+  maxLength: number = 50000,
+): string[] => {
   if (text.length <= maxLength) {
     return [text];
   }
@@ -554,7 +594,7 @@ const splitTextIntoChunks = (text: string, maxLength: number = 50000): string[] 
  * Convert column index (0-based) to column letter (A, B, ..., Z, AA, AB, ...)
  */
 const getColumnLetter = (colIndex: number): string => {
-  let result = '';
+  let result = "";
   let num = colIndex;
   while (num >= 0) {
     result = String.fromCharCode(65 + (num % 26)) + result;
@@ -568,7 +608,7 @@ const getColumnLetter = (colIndex: number): string => {
  */
 const ensureQuestionBankHeaders = async (
   technologyName: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<void> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
@@ -579,10 +619,11 @@ const ensureQuestionBankHeaders = async (
     });
 
     const headerRow = headerResponse.data.values?.[0] || [];
-    const expectedHeaders = ['No', 'Question', 'Answer', 'Image'];
-    
+    const expectedHeaders = ["No", "Question", "Answer", "Image"];
+
     // Check if headers match expected format (at least first 4 columns)
-    const headersMatch = headerRow.length >= 4 &&
+    const headersMatch =
+      headerRow.length >= 4 &&
       headerRow[0] === expectedHeaders[0] &&
       headerRow[1] === expectedHeaders[1] &&
       headerRow[2] === expectedHeaders[2] &&
@@ -593,7 +634,7 @@ const ensureQuestionBankHeaders = async (
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
         range: `${technologyName}!A1:D1`,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         requestBody: {
           values: [expectedHeaders],
         },
@@ -601,15 +642,19 @@ const ensureQuestionBankHeaders = async (
     }
   } catch (error) {
     // If sheet doesn't exist or range is empty, try to create headers
-    if (error instanceof Error && (error.message.includes('Unable to parse range') || error.message.includes('does not exist'))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Unable to parse range") ||
+        error.message.includes("does not exist"))
+    ) {
       try {
         const sheetsClient = getSheetsClient(accessToken);
         await sheetsClient.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
           range: `${technologyName}!A1:D1`,
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           requestBody: {
-            values: [['No', 'Question', 'Answer', 'Image']],
+            values: [["No", "Question", "Answer", "Image"]],
           },
         });
       } catch (updateError) {
@@ -628,11 +673,11 @@ const ensureQuestionBankHeaders = async (
  */
 export const getQuestions = async (
   technologyName: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<Question[]> => {
   // Ensure headers exist before reading data
   await ensureQuestionBankHeaders(technologyName, accessToken);
-  
+
   try {
     const sheetsClient = getSheetsClient(accessToken);
     // Read up to column Z to handle split text
@@ -645,10 +690,10 @@ export const getQuestions = async (
     return rows.map((row: any[], index: number) => {
       // Reconstruct question, answer, imageUrls, and firstImage from multiple columns
       // Each group is 4 columns: [Q, A, Images, FirstImage]
-      let question = '';
-      let answer = '';
-      let imageUrlsString = '';
-      let firstImage = '';
+      let question = "";
+      let answer = "";
+      let imageUrlsString = "";
+      let firstImage = "";
 
       // Process in groups of 4 columns starting from index 1 (after Serial number)
       for (let i = 1; i < row.length; i += 4) {
@@ -664,27 +709,38 @@ export const getQuestions = async (
       let imageUrls: string[] = [];
       if (imageUrlsString) {
         // Try new format first (||| delimiter)
-        if (imageUrlsString.includes('|||')) {
-          imageUrls = imageUrlsString.split('|||').map((url: string) => url.trim()).filter(Boolean);
+        if (imageUrlsString.includes("|||")) {
+          imageUrls = imageUrlsString
+            .split("|||")
+            .map((url: string) => url.trim())
+            .filter(Boolean);
         } else {
           // Old format: comma delimiter
           // Base64 data URLs have format: data:image/png;base64,<data>
           // When split by comma, single image becomes: ["data:image/png;base64", "<data>"]
           // We need to detect this pattern and reconstruct the URL
-          const commaSplit = imageUrlsString.split(',');
-          if (commaSplit.length === 2 && commaSplit[0].includes('base64') && !commaSplit[1].includes('data:')) {
+          const commaSplit = imageUrlsString.split(",");
+          if (
+            commaSplit.length === 2 &&
+            commaSplit[0].includes("base64") &&
+            !commaSplit[1].includes("data:")
+          ) {
             // This is likely a single base64 image that was incorrectly split
             // Reconstruct it by joining with comma
-            imageUrls = [commaSplit.join(',')];
+            imageUrls = [commaSplit.join(",")];
           } else {
             // Multiple images or different format - try to reconstruct intelligently
             const reconstructed: string[] = [];
-            let current = '';
+            let current = "";
             for (let i = 0; i < commaSplit.length; i++) {
               const part = commaSplit[i].trim();
               if (!part) continue;
-              
-              if (part.startsWith('data:') || part.startsWith('http://') || part.startsWith('https://')) {
+
+              if (
+                part.startsWith("data:") ||
+                part.startsWith("http://") ||
+                part.startsWith("https://")
+              ) {
                 // This is a new URL start
                 if (current) {
                   reconstructed.push(current);
@@ -692,13 +748,16 @@ export const getQuestions = async (
                 current = part;
               } else if (current) {
                 // This is continuation of current URL (base64 data after the comma)
-                current += ',' + part;
+                current += "," + part;
               }
             }
             if (current) {
               reconstructed.push(current);
             }
-            imageUrls = reconstructed.length > 0 ? reconstructed : commaSplit.filter(Boolean);
+            imageUrls =
+              reconstructed.length > 0
+                ? reconstructed
+                : commaSplit.filter(Boolean);
           }
         }
       }
@@ -723,14 +782,14 @@ export const getQuestions = async (
  */
 export const addQuestion = async (
   technologyName: string,
-  questionData: QuestionInput
+  questionData: QuestionInput,
 ): Promise<boolean> => {
   try {
     // Ensure headers exist before adding data
     await ensureQuestionBankHeaders(technologyName);
-    
+
     const sheetsClient = getSheetsClient();
-    
+
     // Get current row count
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
@@ -739,12 +798,12 @@ export const addQuestion = async (
     const rowCount = (response?.data?.values?.length || 1) + 1;
 
     // Split all text fields into chunks if they exceed 50,000 characters
-    const questionChunks = splitTextIntoChunks(questionData.question || '');
-    const answerChunks = splitTextIntoChunks(questionData.answer || '');
+    const questionChunks = splitTextIntoChunks(questionData.question || "");
+    const answerChunks = splitTextIntoChunks(questionData.answer || "");
     // Use ||| as delimiter to avoid conflicts with base64 data URLs which contain commas
-    const imageUrlsString = questionData.imageUrls?.join('|||') || '';
+    const imageUrlsString = questionData.imageUrls?.join("|||") || "";
     const imageUrlsChunks = splitTextIntoChunks(imageUrlsString);
-    const firstImage = questionData.imageUrls?.[0] || '';
+    const firstImage = questionData.imageUrls?.[0] || "";
     const firstImageChunks = splitTextIntoChunks(firstImage);
 
     // Build the row array: [Serial, Q1, A1, Images1, FirstImage1, Q2, A2, Images2, FirstImage2, ...]
@@ -758,14 +817,14 @@ export const addQuestion = async (
       questionChunks.length,
       answerChunks.length,
       imageUrlsChunks.length,
-      firstImageChunks.length
+      firstImageChunks.length,
     );
 
     for (let i = 0; i < maxChunks; i++) {
-      rowData.push(questionChunks[i] || ''); // Question chunk
-      rowData.push(answerChunks[i] || ''); // Answer chunk
-      rowData.push(imageUrlsChunks[i] || ''); // Image URLs chunk
-      rowData.push(firstImageChunks[i] || ''); // First image chunk
+      rowData.push(questionChunks[i] || ""); // Question chunk
+      rowData.push(answerChunks[i] || ""); // Answer chunk
+      rowData.push(imageUrlsChunks[i] || ""); // Image URLs chunk
+      rowData.push(firstImageChunks[i] || ""); // First image chunk
     }
 
     // Determine the end column based on how many chunks we have
@@ -775,7 +834,7 @@ export const addQuestion = async (
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
       range,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [rowData],
       },
@@ -795,19 +854,19 @@ export const addQuestion = async (
 export const updateQuestion = async (
   technologyName: string,
   rowIndex: number,
-  questionData: QuestionInput
+  questionData: QuestionInput,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
     const actualRow = rowIndex + 2; // +2 for header and 0-indexing
 
     // Split all text fields into chunks if they exceed 50,000 characters
-    const questionChunks = splitTextIntoChunks(questionData.question || '');
-    const answerChunks = splitTextIntoChunks(questionData.answer || '');
+    const questionChunks = splitTextIntoChunks(questionData.question || "");
+    const answerChunks = splitTextIntoChunks(questionData.answer || "");
     // Use ||| as delimiter to avoid conflicts with base64 data URLs which contain commas
-    const imageUrlsString = questionData.imageUrls?.join('|||') || '';
+    const imageUrlsString = questionData.imageUrls?.join("|||") || "";
     const imageUrlsChunks = splitTextIntoChunks(imageUrlsString);
-    const firstImage = questionData.imageUrls?.[0] || '';
+    const firstImage = questionData.imageUrls?.[0] || "";
     const firstImageChunks = splitTextIntoChunks(firstImage);
 
     // Build the row array: [Serial, Q1, A1, Images1, FirstImage1, Q2, A2, Images2, FirstImage2, ...]
@@ -820,14 +879,14 @@ export const updateQuestion = async (
       questionChunks.length,
       answerChunks.length,
       imageUrlsChunks.length,
-      firstImageChunks.length
+      firstImageChunks.length,
     );
 
     for (let i = 0; i < maxChunks; i++) {
-      rowData.push(questionChunks[i] || ''); // Question chunk
-      rowData.push(answerChunks[i] || ''); // Answer chunk
-      rowData.push(imageUrlsChunks[i] || ''); // Image URLs chunk
-      rowData.push(firstImageChunks[i] || ''); // First image chunk
+      rowData.push(questionChunks[i] || ""); // Question chunk
+      rowData.push(answerChunks[i] || ""); // Answer chunk
+      rowData.push(imageUrlsChunks[i] || ""); // Image URLs chunk
+      rowData.push(firstImageChunks[i] || ""); // First image chunk
     }
 
     // First, read current row to see how many columns are used (to clear old data if needed)
@@ -846,14 +905,14 @@ export const updateQuestion = async (
     // If we're writing fewer columns than exist, extend rowData with empty strings to clear old data
     if (rowData.length < maxCurrentCol) {
       while (rowData.length < maxCurrentCol) {
-        rowData.push('');
+        rowData.push("");
       }
     }
 
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
       range,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [rowData],
       },
@@ -872,7 +931,7 @@ export const deleteQuestion = async (
   technologyName: string,
   rowIndex: number,
   sheetId: number,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
@@ -887,7 +946,7 @@ export const deleteQuestion = async (
             deleteDimension: {
               range: {
                 sheetId,
-                dimension: 'ROWS',
+                dimension: "ROWS",
                 startIndex: actualRow - 1,
                 endIndex: actualRow,
               },
@@ -899,7 +958,7 @@ export const deleteQuestion = async (
 
     // Update serial numbers for all remaining questions after deletion
     const updatedQuestions = await getQuestions(technologyName, accessToken);
-    
+
     // Build updates for serial numbers in column A
     const updates = updatedQuestions.map((q, index) => ({
       range: `${technologyName}!A${index + 2}`, // +2 for header and 1-based index
@@ -911,7 +970,7 @@ export const deleteQuestion = async (
       await sheetsClient.spreadsheets.values.batchUpdate({
         spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
         requestBody: {
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           data: updates,
         },
       });
@@ -931,7 +990,7 @@ export const reorderQuestions = async (
   technologyName: string,
   oldIndex: number,
   newIndex: number,
-  sheetId: number
+  sheetId: number,
 ): Promise<boolean> => {
   try {
     // Handle no-op case
@@ -954,11 +1013,12 @@ export const reorderQuestions = async (
             moveDimension: {
               source: {
                 sheetId,
-                dimension: 'ROWS',
+                dimension: "ROWS",
                 startIndex: oldRowNumber,
                 endIndex: oldRowNumber + 1,
               },
-              destinationIndex: newRowNumber > oldRowNumber ? newRowNumber + 1 : newRowNumber,
+              destinationIndex:
+                newRowNumber > oldRowNumber ? newRowNumber + 1 : newRowNumber,
             },
           },
         ],
@@ -967,7 +1027,7 @@ export const reorderQuestions = async (
 
     // Update serial numbers for all questions after the move
     const updatedQuestions = await getQuestions(technologyName);
-    
+
     // Build updates for serial numbers in column A
     const updates = updatedQuestions.map((q, index) => ({
       range: `${technologyName}!A${index + 2}`, // +2 for header and 1-based index
@@ -979,7 +1039,7 @@ export const reorderQuestions = async (
       await sheetsClient.spreadsheets.values.batchUpdate({
         spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
         requestBody: {
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           data: updates,
         },
       });
@@ -988,7 +1048,7 @@ export const reorderQuestions = async (
     return true;
   } catch (error) {
     // Error reordering questions
-   
+
     return false;
   }
 };
@@ -1000,17 +1060,19 @@ export const reorderQuestions = async (
  * Returns both the sheet name (with correct casing) and sheet ID
  * Note: Project List sheet (tab) is inside the WORK_SUMMARY spreadsheet, not PROJECT_LISTING
  */
-const findProjectListSheet = async (accessToken: string | null = null): Promise<{ 
-  sheetName: string; 
-  sheetId?: number; 
-  availableSheets: string[] 
+const findProjectListSheet = async (
+  accessToken: string | null = null,
+): Promise<{
+  sheetName: string;
+  sheetId?: number;
+  availableSheets: string[];
 }> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
-    
+
     if (!SPREADSHEET_IDS.WORK_SUMMARY) {
       // WORK_SUMMARY spreadsheet ID is not configured
-      return { sheetName: 'Project List', availableSheets: [] };
+      return { sheetName: "Project List", availableSheets: [] };
     }
 
     const response = await sheetsClient.spreadsheets.get({
@@ -1018,54 +1080,50 @@ const findProjectListSheet = async (accessToken: string | null = null): Promise<
     });
 
     const sheetsList = response.data.sheets || [];
-    const availableSheets = sheetsList.map((sheet: any) => sheet.properties?.title).filter(Boolean);
-    
+    const availableSheets = sheetsList
+      .map((sheet: any) => sheet.properties?.title)
+      .filter(Boolean);
+
     // Case-insensitive search for "Project List" sheet (tab)
     // Normalize the search: remove all whitespace and convert to lowercase for comparison
-    let projectListSheet = sheetsList.find(
-      (sheet:any) => {
-        const title = sheet.properties?.title || '';
-        // Remove all whitespace (spaces, tabs, etc.) and compare
-        const normalized = title.replace(/\s+/g, ' ').trim().toLowerCase();
-        return normalized === 'project list';
-      }
-    );
+    let projectListSheet = sheetsList.find((sheet: any) => {
+      const title = sheet.properties?.title || "";
+      // Remove all whitespace (spaces, tabs, etc.) and compare
+      const normalized = title.replace(/\s+/g, " ").trim().toLowerCase();
+      return normalized === "project list";
+    });
 
     // If not found, try partial match (contains both "project" and "list" in any order)
     if (!projectListSheet) {
-      projectListSheet = sheetsList.find(
-        (sheet:any) => {
-          const title = (sheet.properties?.title || '').toLowerCase();
-          // Check if title contains both words (in any order)
-          return title.includes('project') && title.includes('list');
-        }
-      );
+      projectListSheet = sheetsList.find((sheet: any) => {
+        const title = (sheet.properties?.title || "").toLowerCase();
+        // Check if title contains both words (in any order)
+        return title.includes("project") && title.includes("list");
+      });
     }
 
     // If still not found, try to find by exact name match (case-sensitive) from available sheets
     if (!projectListSheet) {
-      projectListSheet = sheetsList.find(
-        (sheet:any) => {
-          const title = sheet.properties?.title || '';
-          return title === 'Project List';
-        }
-      );
+      projectListSheet = sheetsList.find((sheet: any) => {
+        const title = sheet.properties?.title || "";
+        return title === "Project List";
+      });
     }
 
     if (!projectListSheet?.properties?.title) {
-      const sheetsListStr = availableSheets.join(', ');
+      const sheetsListStr = availableSheets.join(", ");
       // Project List sheet (tab) not found in WORK_SUMMARY spreadsheet
-      return { sheetName: 'Project List', availableSheets };
+      return { sheetName: "Project List", availableSheets };
     }
 
     return {
       sheetName: projectListSheet.properties.title,
       sheetId: projectListSheet.properties?.sheetId,
-      availableSheets
+      availableSheets,
     };
   } catch (error) {
     // Error finding Project List sheet
-    return { sheetName: 'Project List', availableSheets: [] };
+    return { sheetName: "Project List", availableSheets: [] };
   }
 };
 
@@ -1073,7 +1131,9 @@ const findProjectListSheet = async (accessToken: string | null = null): Promise<
  * Helper to get the actual sheet name (with correct casing) for "Project List"
  * This ensures range references work correctly regardless of sheet name casing
  */
-const getProjectListSheetName = async (accessToken: string | null = null): Promise<string> => {
+const getProjectListSheetName = async (
+  accessToken: string | null = null,
+): Promise<string> => {
   const result = await findProjectListSheet(accessToken);
   return result.sheetName;
 };
@@ -1081,7 +1141,9 @@ const getProjectListSheetName = async (accessToken: string | null = null): Promi
 /**
  * Get all projects
  */
-export const getProjects = async (accessToken: string | null = null): Promise<Project[]> => {
+export const getProjects = async (
+  accessToken: string | null = null,
+): Promise<Project[]> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
     const sheetName = await getProjectListSheetName(accessToken);
@@ -1093,9 +1155,9 @@ export const getProjects = async (accessToken: string | null = null): Promise<Pr
     const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => ({
       id: `project-${index}`,
-      no: row[0]?.toString() || '',
-      project: row[1] || '',
-      projectId: row[2] || '',
+      no: row[0]?.toString() || "",
+      project: row[1] || "",
+      projectId: row[2] || "",
     }));
   } catch (error) {
     // Error getting projects
@@ -1106,7 +1168,9 @@ export const getProjects = async (accessToken: string | null = null): Promise<Pr
 /**
  * Add a project
  */
-export const addProject = async (projectData: ProjectInput): Promise<boolean> => {
+export const addProject = async (
+  projectData: ProjectInput,
+): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
     const sheetName = await getProjectListSheetName();
@@ -1119,7 +1183,7 @@ export const addProject = async (projectData: ProjectInput): Promise<boolean> =>
     await sheetsClient.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
       range: `${sheetName}!A${rowCount}`,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [[rowCount - 1, projectData.project, projectData.projectId]],
       },
@@ -1136,7 +1200,7 @@ export const addProject = async (projectData: ProjectInput): Promise<boolean> =>
  */
 export const updateProject = async (
   rowIndex: number,
-  projectData: ProjectInput
+  projectData: ProjectInput,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
@@ -1146,7 +1210,7 @@ export const updateProject = async (
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
       range: `${sheetName}!A${actualRow}:C${actualRow}`,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [[rowIndex + 1, projectData.project, projectData.projectId]],
       },
@@ -1161,7 +1225,10 @@ export const updateProject = async (
 /**
  * Delete a project
  */
-export const deleteProject = async (rowIndex: number, sheetId: number): Promise<boolean> => {
+export const deleteProject = async (
+  rowIndex: number,
+  sheetId: number,
+): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
     const actualRow = rowIndex + 2;
@@ -1174,7 +1241,7 @@ export const deleteProject = async (rowIndex: number, sheetId: number): Promise<
             deleteDimension: {
               range: {
                 sheetId,
-                dimension: 'ROWS',
+                dimension: "ROWS",
                 startIndex: actualRow - 1,
                 endIndex: actualRow,
               },
@@ -1196,7 +1263,7 @@ export const deleteProject = async (rowIndex: number, sheetId: number): Promise<
 export const reorderProjects = async (
   oldIndex: number,
   newIndex: number,
-  sheetId: number
+  sheetId: number,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
@@ -1212,7 +1279,7 @@ export const reorderProjects = async (
             moveDimension: {
               source: {
                 sheetId,
-                dimension: 'ROWS',
+                dimension: "ROWS",
                 startIndex: actualOldRow - 1,
                 endIndex: actualOldRow,
               },
@@ -1225,7 +1292,7 @@ export const reorderProjects = async (
 
     // Update serial numbers for all projects after the move
     const updatedProjects = await getProjects();
-    
+
     // Build updates for serial numbers in column A
     const sheetName = await getProjectListSheetName();
     const updates = updatedProjects.map((p, index) => ({
@@ -1238,7 +1305,7 @@ export const reorderProjects = async (
       await sheetsClient.spreadsheets.values.batchUpdate({
         spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
         requestBody: {
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           data: updates,
         },
       });
@@ -1256,23 +1323,25 @@ export const reorderProjects = async (
 /**
  * Ensure Tags sheet exists and has correct headers
  */
-const ensureTagsSheet = async (accessToken: string | null = null): Promise<void> => {
+const ensureTagsSheet = async (
+  accessToken: string | null = null,
+): Promise<void> => {
   try {
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
       // TAGS spreadsheet ID is not configured
       return;
     }
 
     const sheetsClient = getSheetsClient(accessToken);
-    
+
     // Check if Tags sheet exists
     const spreadsheet = await sheetsClient.spreadsheets.get({
       spreadsheetId: SPREADSHEET_IDS.TAGS,
     });
 
     const sheets = spreadsheet.data.sheets || [];
-    const tagsSheet = sheets.find((sheet: any) => 
-      sheet.properties?.title?.toLowerCase() === 'tags'
+    const tagsSheet = sheets.find(
+      (sheet: any) => sheet.properties?.title?.toLowerCase() === "tags",
     );
 
     if (!tagsSheet) {
@@ -1284,7 +1353,7 @@ const ensureTagsSheet = async (accessToken: string | null = null): Promise<void>
             {
               addSheet: {
                 properties: {
-                  title: 'Tags',
+                  title: "Tags",
                 },
               },
             },
@@ -1296,19 +1365,19 @@ const ensureTagsSheet = async (accessToken: string | null = null): Promise<void>
     // Check if headers exist
     const headersResponse = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.TAGS,
-      range: 'Tags!A1:B1',
+      range: "Tags!A1:B1",
     });
 
     const headers = headersResponse?.data?.values?.[0] || [];
-    
-    if (headers.length === 0 || headers[0] !== 'No' || headers[1] !== 'Name') {
+
+    if (headers.length === 0 || headers[0] !== "No" || headers[1] !== "Name") {
       // Set headers
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_IDS.TAGS,
-        range: 'Tags!A1:B1',
-        valueInputOption: 'RAW',
+        range: "Tags!A1:B1",
+        valueInputOption: "RAW",
         requestBody: {
-          values: [['No', 'Name']],
+          values: [["No", "Name"]],
         },
       });
     }
@@ -1317,23 +1386,23 @@ const ensureTagsSheet = async (accessToken: string | null = null): Promise<void>
     // Check existing tags directly to avoid recursion
     const tagsResponse = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.TAGS,
-      range: 'Tags!A2:B1000',
+      range: "Tags!A2:B1000",
     });
-    
+
     const rows = tagsResponse?.data?.values || [];
-    const dailyTagExists = rows.some((row: any[]) => 
-      row[1]?.toLowerCase() === 'daily'
+    const dailyTagExists = rows.some(
+      (row: any[]) => row[1]?.toLowerCase() === "daily",
     );
-    
+
     if (!dailyTagExists) {
       // Add default "Daily" tag
       const rowCount = rows.length + 2; // +2 for header and 1-based index
       await sheetsClient.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_IDS.TAGS,
         range: `Tags!A${rowCount}`,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         requestBody: {
-          values: [[rows.length + 1, 'Daily']],
+          values: [[rows.length + 1, "Daily"]],
         },
       });
     }
@@ -1345,26 +1414,28 @@ const ensureTagsSheet = async (accessToken: string | null = null): Promise<void>
 /**
  * Get all tags
  */
-export const getTags = async (accessToken: string | null = null): Promise<Tag[]> => {
+export const getTags = async (
+  accessToken: string | null = null,
+): Promise<Tag[]> => {
   try {
     await ensureTagsSheet(accessToken);
     const sheetsClient = getSheetsClient(accessToken);
-    
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
       // TAGS spreadsheet ID is not configured
       return [];
     }
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.TAGS,
-      range: 'Tags!A2:B1000',
+      range: "Tags!A2:B1000",
     });
 
     const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => ({
       id: `tag-${index}`,
-      no: row[0]?.toString() || '',
-      name: row[1] || '',
+      no: row[0]?.toString() || "",
+      name: row[1] || "",
     }));
   } catch (error) {
     // Error getting tags
@@ -1375,17 +1446,20 @@ export const getTags = async (accessToken: string | null = null): Promise<Tag[]>
 /**
  * Add a tag
  */
-export const addTag = async (tagData: TagInput, accessToken: string | null = null): Promise<{ success: boolean; error?: string }> => {
+export const addTag = async (
+  tagData: TagInput,
+  accessToken: string | null = null,
+): Promise<{ success: boolean; error?: string }> => {
   try {
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
       // TAGS spreadsheet ID is not configured
-      const errorMsg = 'TAGS spreadsheet ID is not configured';
+      const errorMsg = "TAGS spreadsheet ID is not configured";
       console.error(errorMsg);
       return { success: false, error: errorMsg };
     }
 
     if (!accessToken) {
-      const errorMsg = 'Google access token is required';
+      const errorMsg = "Google access token is required";
       console.error(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -1395,14 +1469,14 @@ export const addTag = async (tagData: TagInput, accessToken: string | null = nul
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.TAGS,
-      range: 'Tags!A:A',
+      range: "Tags!A:A",
     });
     const rowCount = (response?.data?.values?.length || 1) + 1;
 
     await sheetsClient.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_IDS.TAGS,
       range: `Tags!A${rowCount}`,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [[rowCount - 1, tagData.name]],
       },
@@ -1410,8 +1484,9 @@ export const addTag = async (tagData: TagInput, accessToken: string | null = nul
     return { success: true };
   } catch (error: any) {
     // Error adding tag
-    const errorMsg = error?.message || 'Unknown error occurred while adding tag';
-    console.error('Error adding tag:', error);
+    const errorMsg =
+      error?.message || "Unknown error occurred while adding tag";
+    console.error("Error adding tag:", error);
     return { success: false, error: errorMsg };
   }
 };
@@ -1422,14 +1497,14 @@ export const addTag = async (tagData: TagInput, accessToken: string | null = nul
 export const updateTag = async (
   rowIndex: number,
   tagData: TagInput,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
-    
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
       // TAGS spreadsheet ID is not configured
-      console.error('TAGS spreadsheet ID is not configured');
+      console.error("TAGS spreadsheet ID is not configured");
       return false;
     }
 
@@ -1438,7 +1513,7 @@ export const updateTag = async (
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_IDS.TAGS,
       range: `Tags!A${actualRow}:B${actualRow}`,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [[rowIndex + 1, tagData.name]],
       },
@@ -1446,7 +1521,7 @@ export const updateTag = async (
     return true;
   } catch (error) {
     // Error updating tag
-    console.error('Error updating tag:', error);
+    console.error("Error updating tag:", error);
     return false;
   }
 };
@@ -1454,11 +1529,14 @@ export const updateTag = async (
 /**
  * Delete a tag
  */
-export const deleteTag = async (rowIndex: number, accessToken: string | null = null): Promise<boolean> => {
+export const deleteTag = async (
+  rowIndex: number,
+  accessToken: string | null = null,
+): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
-    
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === '') {
+
+    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
       // TAGS spreadsheet ID is not configured
       return false;
     }
@@ -1469,8 +1547,8 @@ export const deleteTag = async (rowIndex: number, accessToken: string | null = n
     });
 
     const sheets = spreadsheet.data.sheets || [];
-    const tagsSheet = sheets.find((sheet: any) => 
-      sheet.properties?.title?.toLowerCase() === 'tags'
+    const tagsSheet = sheets.find(
+      (sheet: any) => sheet.properties?.title?.toLowerCase() === "tags",
     );
 
     if (!tagsSheet?.properties?.sheetId) {
@@ -1488,7 +1566,7 @@ export const deleteTag = async (rowIndex: number, accessToken: string | null = n
             deleteDimension: {
               range: {
                 sheetId,
-                dimension: 'ROWS',
+                dimension: "ROWS",
                 startIndex: actualRow - 1,
                 endIndex: actualRow,
               },
@@ -1509,7 +1587,7 @@ export const deleteTag = async (rowIndex: number, accessToken: string | null = n
       await sheetsClient.spreadsheets.values.batchUpdate({
         spreadsheetId: SPREADSHEET_IDS.TAGS,
         requestBody: {
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           data: updates,
         },
       });
@@ -1528,7 +1606,7 @@ export const deleteTag = async (rowIndex: number, accessToken: string | null = n
  * Get all month sheets
  */
 export const getWorkSummaryMonthSheets = async (
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<string[]> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
@@ -1542,7 +1620,7 @@ export const getWorkSummaryMonthSheets = async (
       .map((sheet: any) => sheet.properties.title)
       .filter((title: string) => {
         const lowerTitle = title?.toLowerCase().trim();
-        return lowerTitle !== 'sheet1' && lowerTitle !== 'project list';
+        return lowerTitle !== "sheet1" && lowerTitle !== "project list";
       });
   } catch (error) {
     // Error getting month sheets
@@ -1555,7 +1633,7 @@ export const getWorkSummaryMonthSheets = async (
  */
 const ensureWorkSummaryHeaders = async (
   monthSheet: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<void> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
@@ -1566,10 +1644,11 @@ const ensureWorkSummaryHeaders = async (
     });
 
     const headerRow = headerResponse.data.values?.[0] || [];
-    const expectedHeaders = ['No', 'ProjectName', 'WorkSummary', 'Date'];
-    
+    const expectedHeaders = ["No", "ProjectName", "WorkSummary", "Date"];
+
     // Check if headers match expected format
-    const headersMatch = headerRow.length === 4 &&
+    const headersMatch =
+      headerRow.length === 4 &&
       headerRow[0] === expectedHeaders[0] &&
       headerRow[1] === expectedHeaders[1] &&
       headerRow[2] === expectedHeaders[2] &&
@@ -1580,7 +1659,7 @@ const ensureWorkSummaryHeaders = async (
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
         range: `${monthSheet}!A1:D1`,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         requestBody: {
           values: [expectedHeaders],
         },
@@ -1588,15 +1667,19 @@ const ensureWorkSummaryHeaders = async (
     }
   } catch (error) {
     // If sheet doesn't exist or range is empty, try to create headers
-    if (error instanceof Error && (error.message.includes('Unable to parse range') || error.message.includes('does not exist'))) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Unable to parse range") ||
+        error.message.includes("does not exist"))
+    ) {
       try {
         const sheetsClient = getSheetsClient(accessToken);
         await sheetsClient.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
           range: `${monthSheet}!A1:D1`,
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           requestBody: {
-            values: [['No', 'ProjectName', 'WorkSummary', 'Date']],
+            values: [["No", "ProjectName", "WorkSummary", "Date"]],
           },
         });
       } catch (updateError) {
@@ -1613,11 +1696,11 @@ const ensureWorkSummaryHeaders = async (
  */
 export const getWorkSummaryEntriesByMonth = async (
   monthSheet: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<WorkSummaryEntry[]> => {
   // Ensure headers exist before reading data
   await ensureWorkSummaryHeaders(monthSheet, accessToken);
-  
+
   try {
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
@@ -1628,10 +1711,10 @@ export const getWorkSummaryEntriesByMonth = async (
     const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => ({
       id: `ws-${index}`,
-      no: row[0]?.toString() || '',
-      projectName: row[1] || '',
-      workSummary: row[2] || '',
-      date: parseDateFromGoogleSheets(row[3] || ''), // Convert date from DD MMM YYYY to YYYY-MM-DD
+      no: row[0]?.toString() || "",
+      projectName: row[1] || "",
+      workSummary: row[2] || "",
+      date: parseDateFromGoogleSheets(row[3] || ""), // Convert date from DD MMM YYYY to YYYY-MM-DD
     }));
   } catch (error) {
     // Error getting work summary entries
@@ -1646,21 +1729,31 @@ export const getWorkSummaryEntriesByMonth = async (
 const parseMonthNameToDate = (monthName: string): number => {
   try {
     const monthNames = [
-      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC",
     ];
-    
+
     const parts = monthName.trim().toUpperCase().split(/\s+/);
     if (parts.length !== 2) return 0;
-    
+
     const month = monthNames.indexOf(parts[0]);
     const year = parseInt(parts[1]);
-    
+
     if (month === -1 || isNaN(year)) return 0;
-    
+
     // Convert 2-digit year to 4-digit (assume 2000-2099 range)
     const fullYear = year < 50 ? 2000 + year : 1900 + year;
-    
+
     return new Date(fullYear, month, 1).getTime();
   } catch (error) {
     return 0;
@@ -1672,7 +1765,7 @@ const parseMonthNameToDate = (monthName: string): number => {
  * Project List stays at index 0, month sheets are sorted by date descending
  */
 const reorderWorkSummarySheets = async (
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
@@ -1681,19 +1774,19 @@ const reorderWorkSummarySheets = async (
     });
 
     const sheets = response?.data?.sheets || [];
-    
+
     // Categorize sheets
     const projectListSheet = sheets.find((sheet: any) => {
       const title = sheet.properties.title?.toLowerCase().trim();
-      return title === 'project list';
+      return title === "project list";
     });
-    
+
     const monthSheets: any[] = [];
     const otherSheets: any[] = [];
 
     sheets.forEach((sheet: any) => {
       const title = sheet.properties.title?.toLowerCase().trim();
-      if (title === 'project list') {
+      if (title === "project list") {
         // Skip, already have it
         return;
       } else if (parseMonthNameToDate(sheet.properties.title) > 0) {
@@ -1747,7 +1840,7 @@ const reorderWorkSummarySheets = async (
           sheetId: sheet.sheetId,
           index: sheet.index,
         },
-        fields: 'index',
+        fields: "index",
       },
     }));
 
@@ -1768,7 +1861,9 @@ const reorderWorkSummarySheets = async (
 /**
  * Create a new month sheet
  */
-export const createWorkSummaryMonthSheet = async (monthName: string): Promise<boolean> => {
+export const createWorkSummaryMonthSheet = async (
+  monthName: string,
+): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
     const response = await sheetsClient.spreadsheets.batchUpdate({
@@ -1787,14 +1882,15 @@ export const createWorkSummaryMonthSheet = async (monthName: string): Promise<bo
     });
 
     // Add header row to the new sheet
-    const newSheetId = response.data.replies?.[0]?.addSheet?.properties?.sheetId;
+    const newSheetId =
+      response.data.replies?.[0]?.addSheet?.properties?.sheetId;
     if (newSheetId !== undefined) {
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
         range: `${monthName}!A1:D1`,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         requestBody: {
-          values: [['No', 'ProjectName', 'WorkSummary', 'Date']],
+          values: [["No", "ProjectName", "WorkSummary", "Date"]],
         },
       });
     }
@@ -1813,20 +1909,33 @@ export const createWorkSummaryMonthSheet = async (monthName: string): Promise<bo
  * Format date from YYYY-MM-DD to DD MMM YYYY format (e.g., "11 NOV 2025")
  */
 const formatDateForGoogleSheets = (dateString: string): string => {
-  if (!dateString) return '';
-  
+  if (!dateString) return "";
+
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
       // If parsing fails, return original string
       return dateString;
     }
-    
+
     const day = date.getDate(); // Day without leading zero (1-31)
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const months = [
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC",
+    ];
     const month = months[date.getMonth()];
     const year = date.getFullYear();
-    
+
     return `${day} ${month} ${year}`;
   } catch (error) {
     // If any error occurs, return original string
@@ -1839,26 +1948,26 @@ const formatDateForGoogleSheets = (dateString: string): string => {
  * This handles dates read from Google Sheets that may be in either format
  */
 const parseDateFromGoogleSheets = (dateString: string): string => {
-  if (!dateString) return '';
-  
+  if (!dateString) return "";
+
   // Check if it's already in YYYY-MM-DD format
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
     return dateString;
   }
-  
+
   // Try to parse DD MMM YYYY format (e.g., "11 NOV 2025")
   try {
     const date = new Date(dateString);
     if (!isNaN(date.getTime())) {
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
     }
   } catch (error) {
     // If parsing fails, return original string
   }
-  
+
   return dateString;
 };
 
@@ -1867,44 +1976,44 @@ const parseDateFromGoogleSheets = (dateString: string): string => {
  * This ensures the work summary appears in Google Sheets the same way it appears in the table
  */
 const convertHtmlToFormattedText = (html: string): string => {
-  if (!html) return '';
-  
+  if (!html) return "";
+
   let text = html;
-  
+
   // First, handle list items - convert <li> to newlines with bullet preservation
   // This preserves bullet points (➤, •, etc.) that are in the text content
-  text = text.replace(/<li[^>]*>/gi, '\n');
-  text = text.replace(/<\/li>/gi, '');
-  
+  text = text.replace(/<li[^>]*>/gi, "\n");
+  text = text.replace(/<\/li>/gi, "");
+
   // Replace <br> and <br/> tags with newlines (handle various formats)
-  text = text.replace(/<br\s*\/?>/gi, '\n');
-  
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+
   // Handle block-level elements - they create line breaks
   // Replace closing tags first to preserve content structure
-  text = text.replace(/<\/p>/gi, '\n');
-  text = text.replace(/<\/div>/gi, '\n');
-  text = text.replace(/<\/h[1-6]>/gi, '\n');
-  text = text.replace(/<\/ul>/gi, '\n');
-  text = text.replace(/<\/ol>/gi, '\n');
-  text = text.replace(/<\/blockquote>/gi, '\n');
-  
+  text = text.replace(/<\/p>/gi, "\n");
+  text = text.replace(/<\/div>/gi, "\n");
+  text = text.replace(/<\/h[1-6]>/gi, "\n");
+  text = text.replace(/<\/ul>/gi, "\n");
+  text = text.replace(/<\/ol>/gi, "\n");
+  text = text.replace(/<\/blockquote>/gi, "\n");
+
   // Replace opening block tags (will be removed, but newlines already handled)
-  text = text.replace(/<p[^>]*>/gi, '');
-  text = text.replace(/<div[^>]*>/gi, '');
-  text = text.replace(/<h[1-6][^>]*>/gi, '');
-  text = text.replace(/<ul[^>]*>/gi, '');
-  text = text.replace(/<ol[^>]*>/gi, '');
-  text = text.replace(/<blockquote[^>]*>/gi, '');
-  
+  text = text.replace(/<p[^>]*>/gi, "");
+  text = text.replace(/<div[^>]*>/gi, "");
+  text = text.replace(/<h[1-6][^>]*>/gi, "");
+  text = text.replace(/<ul[^>]*>/gi, "");
+  text = text.replace(/<ol[^>]*>/gi, "");
+  text = text.replace(/<blockquote[^>]*>/gi, "");
+
   // Remove all remaining HTML tags but preserve their text content
-  text = text.replace(/<[^>]+>/g, '');
-  
+  text = text.replace(/<[^>]+>/g, "");
+
   // Decode HTML entities (common ones)
   text = text
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
@@ -1912,17 +2021,21 @@ const convertHtmlToFormattedText = (html: string): string => {
     .replace(/&ldquo;/g, '"')
     .replace(/&rsquo;/g, "'")
     .replace(/&lsquo;/g, "'")
-    .replace(/&mdash;/g, '—')
-    .replace(/&ndash;/g, '–');
-  
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–");
+
   // Handle HTML entity codes (e.g., &#8217;)
-  text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(parseInt(dec, 10)));
-  text = text.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
-  
+  text = text.replace(/&#(\d+);/g, (match, dec) =>
+    String.fromCharCode(parseInt(dec, 10)),
+  );
+  text = text.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) =>
+    String.fromCharCode(parseInt(hex, 16)),
+  );
+
   // Split into lines and process each line
-  const lines = text.split('\n');
+  const lines = text.split("\n");
   const processedLines: string[] = [];
-  
+
   for (const line of lines) {
     const trimmed = line.trim();
     // Keep non-empty lines and lines with only whitespace that might be intentional
@@ -1930,10 +2043,10 @@ const convertHtmlToFormattedText = (html: string): string => {
       processedLines.push(trimmed);
     }
   }
-  
+
   // Join lines with newlines
-  text = processedLines.join('\n');
-  
+  text = processedLines.join("\n");
+
   // Final trim
   return text.trim();
 };
@@ -1943,38 +2056,40 @@ const convertHtmlToFormattedText = (html: string): string => {
  */
 export const addWorkSummaryEntry = async (
   monthSheet: string,
-  entryData: WorkSummaryEntryInput
+  entryData: WorkSummaryEntryInput,
 ): Promise<boolean> => {
   try {
     // Ensure headers exist before adding data
     await ensureWorkSummaryHeaders(monthSheet);
-    
+
     const sheetsClient = getSheetsClient();
-    
+
     // Get the sheet ID for the month sheet
     const spreadsheetResponse = await sheetsClient.spreadsheets.get({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
     });
-    
+
     const sheets = spreadsheetResponse.data.sheets || [];
-    const targetSheet = sheets.find((sheet: any) => sheet.properties.title === monthSheet);
-    
+    const targetSheet = sheets.find(
+      (sheet: any) => sheet.properties.title === monthSheet,
+    );
+
     if (!targetSheet) {
       // Sheet not found
       return false;
     }
-    
+
     const sheetId = targetSheet.properties.sheetId;
-    
+
     // Get all existing entries
     const entriesResponse = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
       range: `${monthSheet}!A2:D1000`,
     });
-    
+
     const existingRows = entriesResponse.data.values || [];
     const newEntryDate = new Date(entryData.date).getTime();
-    
+
     // Find the insertion point (ascending date order - oldest first)
     let insertIndex = existingRows.length;
     for (let i = 0; i < existingRows.length; i++) {
@@ -1992,26 +2107,26 @@ export const addWorkSummaryEntry = async (
         }
       }
     }
-    
+
     // Calculate the actual row number (row 1 is header, so data starts at row 2)
     // insertIndex is 0-based for the data rows, so row 2 = index 0
     const insertRowNumber = insertIndex + 2;
-    
+
     // Prepare batch update requests
     const requests: any[] = [];
-    
+
     // 1. Insert a new row at the insertion point
     requests.push({
       insertDimension: {
         range: {
           sheetId,
-          dimension: 'ROWS',
+          dimension: "ROWS",
           startIndex: insertRowNumber - 1, // Convert to 0-based index (row 2 = index 1)
           endIndex: insertRowNumber,
         },
       },
     });
-    
+
     // 2. Update the new row with entry data
     requests.push({
       updateCells: {
@@ -2024,18 +2139,28 @@ export const addWorkSummaryEntry = async (
         },
         rows: [
           {
-              values: [
+            values: [
               { userEnteredValue: { numberValue: insertIndex + 1 } }, // Serial number
               { userEnteredValue: { stringValue: entryData.projectName } },
-              { userEnteredValue: { stringValue: convertHtmlToFormattedText(entryData.workSummary) } }, // Convert HTML to formatted text
-              { userEnteredValue: { stringValue: formatDateForGoogleSheets(entryData.date) } }, // Format date as DD MMM YYYY
+              {
+                userEnteredValue: {
+                  stringValue: convertHtmlToFormattedText(
+                    entryData.workSummary,
+                  ),
+                },
+              }, // Convert HTML to formatted text
+              {
+                userEnteredValue: {
+                  stringValue: formatDateForGoogleSheets(entryData.date),
+                },
+              }, // Format date as DD MMM YYYY
             ],
           },
         ],
-        fields: 'userEnteredValue',
+        fields: "userEnteredValue",
       },
     });
-    
+
     // Execute the batch update (insert row and add data)
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
@@ -2043,14 +2168,18 @@ export const addWorkSummaryEntry = async (
         requests,
       },
     });
-    
+
     // 3. Update serial numbers for all rows after the insertion point
     // After inserting, all rows that were at insertIndex or later need their serial numbers updated
     if (insertIndex < existingRows.length) {
       const serialNumberUpdates = [];
       // Update rows that were originally at insertIndex and later
       // After insertion, these rows shifted down by 1 row
-      for (let originalIndex = insertIndex; originalIndex < existingRows.length; originalIndex++) {
+      for (
+        let originalIndex = insertIndex;
+        originalIndex < existingRows.length;
+        originalIndex++
+      ) {
         // After insertion, the row that was at originalIndex is now at sheet row:
         // originalIndex + 2 (header at row 1, data starts at row 2) + 1 (inserted row) = originalIndex + 3
         const newRowNumber = originalIndex + 3;
@@ -2064,18 +2193,18 @@ export const addWorkSummaryEntry = async (
           values: [[newSerialNumber]],
         });
       }
-      
+
       if (serialNumberUpdates.length > 0) {
         await sheetsClient.spreadsheets.values.batchUpdate({
           spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
           requestBody: {
-            valueInputOption: 'RAW',
+            valueInputOption: "RAW",
             data: serialNumberUpdates,
           },
         });
       }
     }
-    
+
     return true;
   } catch (error) {
     // Error adding work summary entry
@@ -2089,27 +2218,29 @@ export const addWorkSummaryEntry = async (
 export const updateWorkSummaryEntry = async (
   monthSheet: string,
   rowIndex: number,
-  entryData: WorkSummaryEntryInput
+  entryData: WorkSummaryEntryInput,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
-    
+
     // Get the sheet ID for the month sheet
     const spreadsheetResponse = await sheetsClient.spreadsheets.get({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
     });
-    
+
     const sheets = spreadsheetResponse.data.sheets || [];
-    const targetSheet = sheets.find((sheet: any) => sheet.properties.title === monthSheet);
-    
+    const targetSheet = sheets.find(
+      (sheet: any) => sheet.properties.title === monthSheet,
+    );
+
     if (!targetSheet) {
       // Sheet not found
       return false;
     }
-    
+
     const sheetId = targetSheet.properties.sheetId;
     const actualRow = rowIndex + 2;
-    
+
     // Update the row with entry data using updateCells to preserve HTML format exactly as displayed
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
@@ -2128,19 +2259,31 @@ export const updateWorkSummaryEntry = async (
                 {
                   values: [
                     { userEnteredValue: { numberValue: rowIndex + 1 } }, // Serial number
-                    { userEnteredValue: { stringValue: entryData.projectName } },
-                    { userEnteredValue: { stringValue: convertHtmlToFormattedText(entryData.workSummary) } }, // Convert HTML to formatted text
-                    { userEnteredValue: { stringValue: formatDateForGoogleSheets(entryData.date) } }, // Format date as DD MMM YYYY
+                    {
+                      userEnteredValue: { stringValue: entryData.projectName },
+                    },
+                    {
+                      userEnteredValue: {
+                        stringValue: convertHtmlToFormattedText(
+                          entryData.workSummary,
+                        ),
+                      },
+                    }, // Convert HTML to formatted text
+                    {
+                      userEnteredValue: {
+                        stringValue: formatDateForGoogleSheets(entryData.date),
+                      },
+                    }, // Format date as DD MMM YYYY
                   ],
                 },
               ],
-              fields: 'userEnteredValue',
+              fields: "userEnteredValue",
             },
           },
         ],
       },
     });
-    
+
     return true;
   } catch (error) {
     // Error updating work summary entry
@@ -2154,7 +2297,7 @@ export const updateWorkSummaryEntry = async (
 export const deleteWorkSummaryEntry = async (
   monthSheet: string,
   rowIndex: number,
-  sheetId: number
+  sheetId: number,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
@@ -2168,7 +2311,7 @@ export const deleteWorkSummaryEntry = async (
             deleteDimension: {
               range: {
                 sheetId,
-                dimension: 'ROWS',
+                dimension: "ROWS",
                 startIndex: actualRow - 1,
                 endIndex: actualRow,
               },
@@ -2191,8 +2334,18 @@ export const getMonthNameFromDate = (dateString: string): string | null => {
   try {
     const date = new Date(dateString);
     const monthNames = [
-      'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
-      'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
+      "JAN",
+      "FEB",
+      "MAR",
+      "APR",
+      "MAY",
+      "JUN",
+      "JUL",
+      "AUG",
+      "SEP",
+      "OCT",
+      "NOV",
+      "DEC",
     ];
     const month = monthNames[date.getMonth()];
     const year = date.getFullYear().toString().slice(-2);
@@ -2209,22 +2362,22 @@ export const getMonthNameFromDate = (dateString: string): string | null => {
  * Get all practical tasks
  */
 export const getPracticalTasks = async (
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<PracticalTask[]> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
-      range: 'UserDetail!A2:E1000',
+      range: "UserDetail!A2:E1000",
     });
 
     const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => ({
       id: `pt-${index}`,
-      no: row[0]?.toString() || '',
-      question: row[1] || '',
-      answer: row[2] || '',
-      image: row[3] || '',
+      no: row[0]?.toString() || "",
+      question: row[1] || "",
+      answer: row[2] || "",
+      image: row[3] || "",
     }));
   } catch (error) {
     // Error getting practical tasks
@@ -2235,7 +2388,9 @@ export const getPracticalTasks = async (
 /**
  * Ensure practical task headers exist for a technology sheet
  */
-const ensurePracticalTaskHeaders = async (technologyName: string): Promise<void> => {
+const ensurePracticalTaskHeaders = async (
+  technologyName: string,
+): Promise<void> => {
   try {
     const sheetsClient = getSheetsClient();
     const response = await sheetsClient.spreadsheets.values.get({
@@ -2248,15 +2403,15 @@ const ensurePracticalTaskHeaders = async (technologyName: string): Promise<void>
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
         range: `${technologyName}!A1:D1`,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         requestBody: {
-          values: [['No', 'Question', 'Answer', 'Image']],
+          values: [["No", "Question", "Answer", "Image"]],
         },
       });
     }
   } catch (error: any) {
     // If sheet doesn't exist, the error will be handled by the caller
-    if (error?.message?.includes('Unable to parse range')) {
+    if (error?.message?.includes("Unable to parse range")) {
       // Sheet might not exist, but that's okay - headers will be created when adding first task
       return;
     }
@@ -2269,7 +2424,7 @@ const ensurePracticalTaskHeaders = async (technologyName: string): Promise<void>
  */
 export const getPracticalTasksByTechnology = async (
   technologyName: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<PracticalTask[]> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
@@ -2281,9 +2436,9 @@ export const getPracticalTasksByTechnology = async (
     const rows = response?.data?.values || [];
     return rows.map((row: any[], index: number) => {
       // Handle chunked data similar to questions
-      let question = '';
-      let answer = '';
-      let image = '';
+      let question = "";
+      let answer = "";
+      let image = "";
 
       // Process in groups of 3 columns starting from index 1 (after Serial number)
       for (let i = 1; i < row.length; i += 3) {
@@ -2297,11 +2452,11 @@ export const getPracticalTasksByTechnology = async (
         no: row[0]?.toString() || (index + 1).toString(),
         question,
         answer,
-        image: image || row[3] || '', // Fallback to column D if no chunks
+        image: image || row[3] || "", // Fallback to column D if no chunks
       };
     });
   } catch (error: any) {
-    if (error?.message?.includes('Unable to parse range')) {
+    if (error?.message?.includes("Unable to parse range")) {
       // Sheet doesn't exist yet, return empty array
       return [];
     }
@@ -2316,14 +2471,14 @@ export const getPracticalTasksByTechnology = async (
  */
 export const addPracticalTask = async (
   technologyName: string,
-  taskData: { question: string; answer: string; image?: string }
+  taskData: { question: string; answer: string; image?: string },
 ): Promise<boolean> => {
   try {
     // Ensure headers exist before adding data
     await ensurePracticalTaskHeaders(technologyName);
-    
+
     const sheetsClient = getSheetsClient();
-    
+
     // Get current row count
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
@@ -2332,9 +2487,9 @@ export const addPracticalTask = async (
     const rowCount = (response?.data?.values?.length || 1) + 1;
 
     // Split all text fields into chunks if they exceed 50,000 characters
-    const questionChunks = splitTextIntoChunks(taskData.question || '');
-    const answerChunks = splitTextIntoChunks(taskData.answer || '');
-    const imageChunks = splitTextIntoChunks(taskData.image || '');
+    const questionChunks = splitTextIntoChunks(taskData.question || "");
+    const answerChunks = splitTextIntoChunks(taskData.answer || "");
+    const imageChunks = splitTextIntoChunks(taskData.image || "");
 
     // Build the row array: [Serial, Q1, A1, I1, Q2, A2, I2, ...]
     const rowData: any[] = [
@@ -2345,13 +2500,13 @@ export const addPracticalTask = async (
     const maxChunks = Math.max(
       questionChunks.length,
       answerChunks.length,
-      imageChunks.length
+      imageChunks.length,
     );
 
     for (let i = 0; i < maxChunks; i++) {
-      rowData.push(questionChunks[i] || ''); // Question chunk
-      rowData.push(answerChunks[i] || ''); // Answer chunk
-      rowData.push(imageChunks[i] || ''); // Image chunk
+      rowData.push(questionChunks[i] || ""); // Question chunk
+      rowData.push(answerChunks[i] || ""); // Answer chunk
+      rowData.push(imageChunks[i] || ""); // Image chunk
     }
 
     // Determine the end column based on how many chunks we have
@@ -2361,7 +2516,7 @@ export const addPracticalTask = async (
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
       range,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [rowData],
       },
@@ -2380,16 +2535,16 @@ export const addPracticalTask = async (
 export const updatePracticalTask = async (
   technologyName: string,
   rowIndex: number,
-  taskData: { question: string; answer: string; image?: string }
+  taskData: { question: string; answer: string; image?: string },
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();
     const actualRow = rowIndex + 2; // +2 for header and 0-indexing
 
     // Split all text fields into chunks if they exceed 50,000 characters
-    const questionChunks = splitTextIntoChunks(taskData.question || '');
-    const answerChunks = splitTextIntoChunks(taskData.answer || '');
-    const imageChunks = splitTextIntoChunks(taskData.image || '');
+    const questionChunks = splitTextIntoChunks(taskData.question || "");
+    const answerChunks = splitTextIntoChunks(taskData.answer || "");
+    const imageChunks = splitTextIntoChunks(taskData.image || "");
 
     // Build the row array: [Serial, Q1, A1, I1, Q2, A2, I2, ...]
     const rowData: any[] = [
@@ -2400,13 +2555,13 @@ export const updatePracticalTask = async (
     const maxChunks = Math.max(
       questionChunks.length,
       answerChunks.length,
-      imageChunks.length
+      imageChunks.length,
     );
 
     for (let i = 0; i < maxChunks; i++) {
-      rowData.push(questionChunks[i] || ''); // Question chunk
-      rowData.push(answerChunks[i] || ''); // Answer chunk
-      rowData.push(imageChunks[i] || ''); // Image chunk
+      rowData.push(questionChunks[i] || ""); // Question chunk
+      rowData.push(answerChunks[i] || ""); // Answer chunk
+      rowData.push(imageChunks[i] || ""); // Image chunk
     }
 
     // Determine the end column based on how many chunks we have
@@ -2416,7 +2571,7 @@ export const updatePracticalTask = async (
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
       range,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [rowData],
       },
@@ -2434,7 +2589,7 @@ export const updatePracticalTask = async (
 export const deletePracticalTask = async (
   technologyName: string,
   rowIndex: number,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
@@ -2445,7 +2600,7 @@ export const deletePracticalTask = async (
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
     });
     const sheet = spreadsheet.data.sheets?.find(
-      (s: any) => s.properties.title === technologyName
+      (s: any) => s.properties.title === technologyName,
     );
     if (!sheet) {
       // Sheet not found
@@ -2462,7 +2617,7 @@ export const deletePracticalTask = async (
             deleteDimension: {
               range: {
                 sheetId,
-                dimension: 'ROWS',
+                dimension: "ROWS",
                 startIndex: actualRow - 1,
                 endIndex: actualRow,
               },
@@ -2478,7 +2633,7 @@ export const deletePracticalTask = async (
       range: `${technologyName}!A2:Z1000`,
     });
     const rows = response?.data?.values || [];
-    
+
     if (rows.length > 0) {
       const updateRequests = rows.map((row: any[], index: number) => {
         const newSerial = index + 1;
@@ -2491,7 +2646,7 @@ export const deletePracticalTask = async (
       await sheetsClient.spreadsheets.values.batchUpdate({
         spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
         requestBody: {
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           data: updateRequests,
         },
       });
@@ -2510,7 +2665,7 @@ export const deletePracticalTask = async (
 export const reorderPracticalTasks = async (
   technologyName: string,
   oldIndex: number,
-  newIndex: number
+  newIndex: number,
 ): Promise<boolean> => {
   try {
     // Handle no-op case
@@ -2519,13 +2674,13 @@ export const reorderPracticalTasks = async (
     }
 
     const sheetsClient = getSheetsClient();
-    
+
     // Get the sheet ID for the technology
     const spreadsheet = await sheetsClient.spreadsheets.get({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
     });
     const sheet = spreadsheet.data.sheets?.find(
-      (s: any) => s.properties.title === technologyName
+      (s: any) => s.properties.title === technologyName,
     );
     if (!sheet) {
       // Sheet not found
@@ -2547,11 +2702,12 @@ export const reorderPracticalTasks = async (
             moveDimension: {
               source: {
                 sheetId,
-                dimension: 'ROWS',
+                dimension: "ROWS",
                 startIndex: oldRowNumber,
                 endIndex: oldRowNumber + 1,
               },
-              destinationIndex: newRowNumber > oldRowNumber ? newRowNumber + 1 : newRowNumber,
+              destinationIndex:
+                newRowNumber > oldRowNumber ? newRowNumber + 1 : newRowNumber,
             },
           },
         ],
@@ -2560,7 +2716,7 @@ export const reorderPracticalTasks = async (
 
     // Update serial numbers for all tasks after the move
     const updatedTasks = await getPracticalTasksByTechnology(technologyName);
-    
+
     // Build updates for serial numbers in column A
     const updates = updatedTasks.map((task, index) => ({
       range: `${technologyName}!A${index + 2}`, // +2 for header and 1-based index
@@ -2572,7 +2728,7 @@ export const reorderPracticalTasks = async (
       await sheetsClient.spreadsheets.values.batchUpdate({
         spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
         requestBody: {
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           data: updates,
         },
       });
@@ -2592,23 +2748,23 @@ export const reorderPracticalTasks = async (
  */
 export const getDashboardCardOrder = async (
   email: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<string[]> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'DashboardOrder!A:Z',
+      range: "DashboardOrder!A:Z",
     });
 
     const rows = response?.data?.values || [];
-    
+
     // Find the row for the current user's email
     for (const row of rows) {
       if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
         // Return the card IDs (excluding the email column)
-        return row.slice(1).filter((id: string) => id && id.trim() !== '');
+        return row.slice(1).filter((id: string) => id && id.trim() !== "");
       }
     }
 
@@ -2626,16 +2782,16 @@ export const getDashboardCardOrder = async (
 export const saveDashboardCardOrder = async (
   email: string,
   cardOrder: string[],
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
-    
+
     // First, try to find if user already has a row
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'DashboardOrder!A:Z',
+      range: "DashboardOrder!A:Z",
     });
 
     const rows = response?.data?.values || [];
@@ -2643,7 +2799,10 @@ export const saveDashboardCardOrder = async (
 
     // Find the row for the current user's email
     for (let i = 0; i < rows.length; i++) {
-      if (rows[i].length > 0 && rows[i][0]?.toLowerCase() === email.toLowerCase()) {
+      if (
+        rows[i].length > 0 &&
+        rows[i][0]?.toLowerCase() === email.toLowerCase()
+      ) {
         rowIndex = i + 1; // +1 because sheets are 1-indexed
         break;
       }
@@ -2656,7 +2815,7 @@ export const saveDashboardCardOrder = async (
       await sheetsClient.spreadsheets.values.update({
         spreadsheetId: loginSpreadsheetId,
         range: `DashboardOrder!A${rowIndex}:Z${rowIndex}`,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         requestBody: {
           values: values,
         },
@@ -2665,8 +2824,8 @@ export const saveDashboardCardOrder = async (
       // Append new row
       await sheetsClient.spreadsheets.values.append({
         spreadsheetId: loginSpreadsheetId,
-        range: 'DashboardOrder!A:Z',
-        valueInputOption: 'RAW',
+        range: "DashboardOrder!A:Z",
+        valueInputOption: "RAW",
         requestBody: {
           values: values,
         },
@@ -2685,39 +2844,42 @@ export const saveDashboardCardOrder = async (
  */
 export const getUserMode = async (
   email: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<string | null> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:E100',
+      range: "UserDetail!A2:E100",
     });
 
     const rows = response?.data?.values || [];
     for (const row of rows) {
       if (row[0]?.toLowerCase() === email.toLowerCase()) {
-        return row[4] || 'Light'; // Assuming mode is in column E
+        return row[4] || "Light"; // Assuming mode is in column E
       }
     }
-    return 'Light';
+    return "Light";
   } catch (error) {
     // Error getting user mode
-    return 'Light';
+    return "Light";
   }
 };
 
 /**
  * Update user mode
  */
-export const updateUserMode = async (email: string, mode: string): Promise<boolean> => {
+export const updateUserMode = async (
+  email: string,
+  mode: string,
+): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient();
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:E100',
+      range: "UserDetail!A2:E100",
     });
 
     const rows = response?.data?.values || [];
@@ -2737,7 +2899,7 @@ export const updateUserMode = async (email: string, mode: string): Promise<boole
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: loginSpreadsheetId,
       range: `UserDetail!E${rowIndex}`,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [[mode]],
       },
@@ -2754,24 +2916,24 @@ export const updateUserMode = async (email: string, mode: string): Promise<boole
  */
 export const getUserProfile = async (
   email: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<UserProfile | null> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:D100',
+      range: "UserDetail!A2:D100",
     });
 
     const rows = response?.data?.values || [];
     for (const row of rows) {
       if (row[0]?.toLowerCase() === email.toLowerCase()) {
         return {
-          email: row[0] || '',
-          password: '', // Don't return password
-          username: row[2] || '',
-          photo: row[3] || '',
+          email: row[0] || "",
+          password: "", // Don't return password
+          username: row[2] || "",
+          photo: row[3] || "",
         };
       }
     }
@@ -2789,14 +2951,14 @@ export const updateUserProfile = async (
   email: string,
   username?: string,
   photo?: string | null,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:D100',
+      range: "UserDetail!A2:D100",
     });
 
     const rows = response?.data?.values || [];
@@ -2817,7 +2979,9 @@ export const updateUserProfile = async (
     // Validate photo size (Google Sheets cell limit is 50,000 characters)
     if (photo !== undefined && photo !== null && photo.length > 50000) {
       // Photo data too large (max 50,000 characters)
-      throw new Error('Photo is too large. Please use a smaller image (max size: ~37KB when base64 encoded)');
+      throw new Error(
+        "Photo is too large. Please use a smaller image (max size: ~37KB when base64 encoded)",
+      );
     }
 
     const updates: any[] = [];
@@ -2830,7 +2994,7 @@ export const updateUserProfile = async (
     if (photo !== undefined) {
       updates.push({
         range: `UserDetail!D${rowIndex}`,
-        values: [[photo || '']],
+        values: [[photo || ""]],
       });
     }
 
@@ -2838,7 +3002,7 @@ export const updateUserProfile = async (
       await sheetsClient.spreadsheets.values.batchUpdate({
         spreadsheetId: loginSpreadsheetId,
         requestBody: {
-          valueInputOption: 'RAW',
+          valueInputOption: "RAW",
           data: updates,
         },
       });
@@ -2860,14 +3024,14 @@ export const updateUserProfile = async (
 export const updateUserPassword = async (
   email: string,
   currentPassword: string,
-  newPassword: string
+  newPassword: string,
 ): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient();
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:B100',
+      range: "UserDetail!A2:B100",
     });
 
     const rows = response?.data?.values || [];
@@ -2876,7 +3040,7 @@ export const updateUserPassword = async (
     for (let i = 0; i < rows.length; i++) {
       if (rows[i][0]?.toLowerCase() === email.toLowerCase()) {
         if (rows[i][1] !== currentPassword) {
-          throw new Error('Current password is incorrect');
+          throw new Error("Current password is incorrect");
         }
         rowIndex = i + 2;
         break;
@@ -2890,7 +3054,7 @@ export const updateUserPassword = async (
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: loginSpreadsheetId,
       range: `UserDetail!B${rowIndex}`,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [[newPassword]],
       },
@@ -2907,22 +3071,22 @@ export const updateUserPassword = async (
  */
 export const getUserColorPalette = async (
   email: string,
-  accessToken: string | null = null
+  accessToken: string | null = null,
 ): Promise<ColorPalette> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:G100',
+      range: "UserDetail!A2:G100",
     });
 
     const rows = response?.data?.values || [];
     for (const row of rows) {
       if (row[0]?.toLowerCase() === email.toLowerCase()) {
         // Convert empty strings to null
-        const lightColor = row[5] && row[5].trim() !== '' ? row[5] : null;
-        const darkColor = row[6] && row[6].trim() !== '' ? row[6] : null;
+        const lightColor = row[5] && row[5].trim() !== "" ? row[5] : null;
+        const darkColor = row[6] && row[6].trim() !== "" ? row[6] : null;
         return {
           lightModeColor: lightColor,
           darkModeColor: darkColor,
@@ -2949,14 +3113,14 @@ export const updateUserColorPalette = async (
   email: string,
   lightModeColor: string | null,
   darkModeColor: string | null,
-  accessToken: string
+  accessToken: string,
 ): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: 'UserDetail!A2:G100',
+      range: "UserDetail!A2:G100",
     });
 
     const rows = response?.data?.values || [];
@@ -2976,13 +3140,13 @@ export const updateUserColorPalette = async (
 
     // Update columns F (lightModeColor) and G (darkModeColor)
     // Convert null to empty string for Google Sheets (empty string will be read back as null)
-    const lightColorValue = lightModeColor === null ? '' : (lightModeColor || '');
-    const darkColorValue = darkModeColor === null ? '' : (darkModeColor || '');
-    
+    const lightColorValue = lightModeColor === null ? "" : lightModeColor || "";
+    const darkColorValue = darkModeColor === null ? "" : darkModeColor || "";
+
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: loginSpreadsheetId,
       range: `UserDetail!F${rowIndex}:G${rowIndex}`,
-      valueInputOption: 'RAW',
+      valueInputOption: "RAW",
       requestBody: {
         values: [[lightColorValue, darkColorValue]],
       },
@@ -2994,4 +3158,3 @@ export const updateUserColorPalette = async (
     return false;
   }
 };
-

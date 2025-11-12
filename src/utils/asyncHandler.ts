@@ -2,12 +2,12 @@
  * Async Handler Utility
  * Wraps async functions to automatically handle errors and avoid try-catch blocks
  */
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from "express";
 
 type AsyncFunction = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => Promise<any>;
 
 /**
@@ -27,7 +27,7 @@ export const asyncHandler = (fn: AsyncFunction) => {
  * @returns Wrapped function that returns a result or throws an error
  */
 export const serviceWrapper = <T extends (...args: any[]) => Promise<any>>(
-  fn: T
+  fn: T,
 ): T => {
   return ((...args: Parameters<T>) => {
     return fn(...args).catch((error: Error) => {
@@ -36,4 +36,3 @@ export const serviceWrapper = <T extends (...args: any[]) => Promise<any>>(
     });
   }) as T;
 };
-

@@ -1,46 +1,45 @@
 /**
  * Questions Routes
  */
-import express from 'express';
-import { authenticateToken, authenticateGoogleToken } from '../middleware/auth';
-import * as questionsController from '../controllers/questionsController';
+import express from "express";
+import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import * as questionsController from "../controllers/questionsController";
 
 const router = express.Router();
 
 // Get questions for a technology (read-only, but supports OAuth if available)
-router.get('/:technologyName', questionsController.getQuestionsByTechnology);
+router.get("/:technologyName", questionsController.getQuestionsByTechnology);
 
 // Add question (requires Google auth)
 router.post(
-  '/:technologyName',
+  "/:technologyName",
   authenticateToken,
   authenticateGoogleToken,
-  questionsController.addQuestionHandler
+  questionsController.addQuestionHandler,
 );
 
 // Update question (requires Google auth)
 router.put(
-  '/:technologyName/:rowIndex',
+  "/:technologyName/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
-  questionsController.updateQuestionHandler
+  questionsController.updateQuestionHandler,
 );
 
 // Delete question (requires Google auth)
 router.delete(
-  '/:technologyName/:rowIndex',
+  "/:technologyName/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
-  questionsController.deleteQuestionHandler
+  questionsController.deleteQuestionHandler,
 );
 
 // Reorder questions (requires Google auth)
 router.post(
-  '/:technologyName/reorder',
+  "/:technologyName/reorder",
   authenticateToken,
   authenticateGoogleToken,
-  questionsController.reorderQuestionsHandler
+  questionsController.reorderQuestionsHandler,
 );
 
 export default router;
-

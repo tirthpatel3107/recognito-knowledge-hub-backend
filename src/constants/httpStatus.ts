@@ -19,9 +19,8 @@ export const HTTP_STATUS = {
  * Response Keys Constants
  */
 export const RESPONSE_KEYS = {
-  SUCCESS: 'success',
-  ERROR: 'error',
-  MESSAGE: 'message',
-  DATA: 'data',
+  SUCCESS: "success",
+  ERROR: "error",
+  MESSAGE: "message",
+  DATA: "data",
 } as const;
-

@@ -1,38 +1,37 @@
 /**
  * Tags Routes
  */
-import express from 'express';
-import { authenticateToken, authenticateGoogleToken } from '../middleware/auth';
-import * as tagsController from '../controllers/tagsController';
+import express from "express";
+import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import * as tagsController from "../controllers/tagsController";
 
 const router = express.Router();
 
 // Get all tags (read-only, but supports OAuth if available)
-router.get('/', tagsController.getAllTags);
+router.get("/", tagsController.getAllTags);
 
 // Add tag (requires Google auth)
 router.post(
-  '/',
+  "/",
   authenticateToken,
   authenticateGoogleToken,
-  tagsController.addTagHandler
+  tagsController.addTagHandler,
 );
 
 // Update tag (requires Google auth)
 router.put(
-  '/:rowIndex',
+  "/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
-  tagsController.updateTagHandler
+  tagsController.updateTagHandler,
 );
 
 // Delete tag (requires Google auth)
 router.delete(
-  '/:rowIndex',
+  "/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
-  tagsController.deleteTagHandler
+  tagsController.deleteTagHandler,
 );
 
 export default router;
-

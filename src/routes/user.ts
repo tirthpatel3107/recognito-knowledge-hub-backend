@@ -1,63 +1,70 @@
 /**
  * User Preferences Routes
  */
-import express from 'express';
-import { authenticateToken, authenticateGoogleToken } from '../middleware/auth';
-import * as userController from '../controllers/userController';
+import express from "express";
+import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import * as userController from "../controllers/userController";
 
 const router = express.Router();
 
 // Get dashboard card order
-router.get('/dashboard-order', authenticateToken, userController.getDashboardCardOrderHandler);
+router.get(
+  "/dashboard-order",
+  authenticateToken,
+  userController.getDashboardCardOrderHandler,
+);
 
 // Save dashboard card order
 router.post(
-  '/dashboard-order',
+  "/dashboard-order",
   authenticateToken,
   authenticateGoogleToken,
-  userController.saveDashboardCardOrderHandler
+  userController.saveDashboardCardOrderHandler,
 );
 
 // Get user mode preference
-router.get('/mode', authenticateToken, userController.getUserModeHandler);
+router.get("/mode", authenticateToken, userController.getUserModeHandler);
 
 // Update user mode preference
 router.post(
-  '/mode',
+  "/mode",
   authenticateToken,
   authenticateGoogleToken,
-  userController.updateUserModeHandler
+  userController.updateUserModeHandler,
 );
 
 // Get user profile (username and email from UserDetail sheet)
-router.get('/profile', authenticateToken, userController.getUserProfileHandler);
+router.get("/profile", authenticateToken, userController.getUserProfileHandler);
 
 // Update user profile (username and photo in UserDetail sheet)
 router.post(
-  '/profile',
+  "/profile",
   authenticateToken,
   authenticateGoogleToken,
-  userController.updateUserProfileHandler
+  userController.updateUserProfileHandler,
 );
 
 // Change user password
 router.post(
-  '/password',
+  "/password",
   authenticateToken,
   authenticateGoogleToken,
-  userController.updateUserPasswordHandler
+  userController.updateUserPasswordHandler,
 );
 
 // Get user color palette preference
-router.get('/color-palette', authenticateToken, userController.getUserColorPaletteHandler);
+router.get(
+  "/color-palette",
+  authenticateToken,
+  userController.getUserColorPaletteHandler,
+);
 
 // Update user color palette preference
 router.post(
-  '/color-palette',
+  "/color-palette",
   authenticateToken,
   authenticateGoogleToken,
-  userController.updateUserColorPaletteHandler
+  userController.updateUserColorPaletteHandler,
 );
 
 export default router;
-

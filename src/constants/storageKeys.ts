@@ -5,7 +5,6 @@
 
 export const STORAGE_KEYS = {
   // Google token storage
-  GOOGLE_ACCESS_TOKEN: 'googleAccessToken',
-  GOOGLE_REFRESH_TOKEN: 'googleRefreshToken',
+  GOOGLE_ACCESS_TOKEN: "googleAccessToken",
+  GOOGLE_REFRESH_TOKEN: "googleRefreshToken",
 } as const;
-

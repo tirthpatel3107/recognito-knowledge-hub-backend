@@ -2,13 +2,17 @@
  * Error Handler Utility
  * Centralized error handling and custom error classes
  */
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from "express";
 
 export class AppError extends Error {
   statusCode: number;
   isOperational: boolean;
 
-  constructor(message: string, statusCode: number = 500, isOperational: boolean = true) {
+  constructor(
+    message: string,
+    statusCode: number = 500,
+    isOperational: boolean = true,
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
@@ -23,13 +27,13 @@ export class ValidationError extends AppError {
 }
 
 export class NotFoundError extends AppError {
-  constructor(resource: string = 'Resource') {
+  constructor(resource: string = "Resource") {
     super(`${resource} not found`, 404);
   }
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message: string = 'Unauthorized') {
+  constructor(message: string = "Unauthorized") {
     super(message, 401);
   }
 }
@@ -41,7 +45,7 @@ export const errorHandler = (
   err: Error | AppError,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   // Error occurred - handled silently (error details in response)
 
@@ -51,7 +55,7 @@ export const errorHandler = (
   // Prepare error response
   const errorResponse: any = {
     success: false,
-    error: err.message || 'Internal server error',
+    error: err.message || "Internal server error",
   };
 
   // Include stack trace
@@ -70,10 +74,9 @@ export const errorHandler = (
   // Set CORS headers if needed
   const origin = req.headers.origin;
   if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
   }
 
   res.status(statusCode).json(errorResponse);
 };
-

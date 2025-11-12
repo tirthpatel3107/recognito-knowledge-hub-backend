@@ -1,46 +1,48 @@
 /**
  * Practical Task Technologies Routes
  */
-import express from 'express';
-import { authenticateToken, authenticateGoogleToken } from '../middleware/auth';
-import * as practicalTaskTechnologiesController from '../controllers/practicalTaskTechnologiesController';
+import express from "express";
+import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import * as practicalTaskTechnologiesController from "../controllers/practicalTaskTechnologiesController";
 
 const router = express.Router();
 
 // Get all practical task technologies (read-only, no auth needed, but supports OAuth if available)
-router.get('/', practicalTaskTechnologiesController.getAllPracticalTaskTechnologies);
+router.get(
+  "/",
+  practicalTaskTechnologiesController.getAllPracticalTaskTechnologies,
+);
 
 // Create practical task technology (requires Google auth)
 router.post(
-  '/',
+  "/",
   authenticateToken,
   authenticateGoogleToken,
-  practicalTaskTechnologiesController.createPracticalTaskTechnologyHandler
+  practicalTaskTechnologiesController.createPracticalTaskTechnologyHandler,
 );
 
 // Update practical task technology (requires Google auth)
 router.put(
-  '/:sheetId',
+  "/:sheetId",
   authenticateToken,
   authenticateGoogleToken,
-  practicalTaskTechnologiesController.updatePracticalTaskTechnologyHandler
+  practicalTaskTechnologiesController.updatePracticalTaskTechnologyHandler,
 );
 
 // Delete practical task technology (requires Google auth)
 router.delete(
-  '/:sheetId',
+  "/:sheetId",
   authenticateToken,
   authenticateGoogleToken,
-  practicalTaskTechnologiesController.deletePracticalTaskTechnologyHandler
+  practicalTaskTechnologiesController.deletePracticalTaskTechnologyHandler,
 );
 
 // Reorder practical task technologies (requires Google auth)
 router.post(
-  '/reorder',
+  "/reorder",
   authenticateToken,
   authenticateGoogleToken,
-  practicalTaskTechnologiesController.reorderPracticalTaskTechnologiesHandler
+  practicalTaskTechnologiesController.reorderPracticalTaskTechnologiesHandler,
 );
 
 export default router;
-

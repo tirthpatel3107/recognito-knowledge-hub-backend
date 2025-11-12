@@ -11,7 +11,8 @@ interface TokenEntry {
 
 const tokenStore = new Map<string, TokenEntry>();
 
-const normalizeEmail = (email: string = ''): string => email.trim().toLowerCase();
+const normalizeEmail = (email: string = ""): string =>
+  email.trim().toLowerCase();
 
 interface StoreTokenOptions {
   expiresInSeconds?: number | null;
@@ -20,17 +21,19 @@ interface StoreTokenOptions {
 export const storeGoogleToken = (
   email: string,
   accessToken: string,
-  { expiresInSeconds = null }: StoreTokenOptions = {}
+  { expiresInSeconds = null }: StoreTokenOptions = {},
 ): TokenEntry => {
   if (!email || !accessToken) {
-    throw new Error('Email and access token are required to store Google credentials.');
+    throw new Error(
+      "Email and access token are required to store Google credentials.",
+    );
   }
 
   const normalizedEmail = normalizeEmail(email);
   const entry: TokenEntry = {
     accessToken,
     expiresAt:
-      typeof expiresInSeconds === 'number' && expiresInSeconds > 0
+      typeof expiresInSeconds === "number" && expiresInSeconds > 0
         ? Date.now() + expiresInSeconds * 1000
         : null,
     updatedAt: Date.now(),
@@ -68,9 +71,9 @@ export const clearGoogleToken = (email: string): void => {
   tokenStore.delete(normalizeEmail(email));
 };
 
-export const hasGoogleToken = (email: string): boolean => getGoogleToken(email) !== null;
+export const hasGoogleToken = (email: string): boolean =>
+  getGoogleToken(email) !== null;
 
 export const resetTokenStore = (): void => {
   tokenStore.clear();
 };
-

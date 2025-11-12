@@ -2,7 +2,7 @@
  * Questions Controller
  * Handles question-related operations
  */
-import { Request, Response } from 'express';
+import { Request, Response } from "express";
 import {
   getQuestions,
   addQuestion,
@@ -11,137 +11,157 @@ import {
   reorderQuestions,
   getTechnologies,
   setUserCredentials,
-} from '../services/googleSheetsService';
-import { asyncHandler } from '../utils/asyncHandler';
-import { sendSuccess, sendError, sendValidationError, sendNotFound } from '../utils/responseHelper';
-import { getGoogleTokenFromRequest } from '../utils/googleTokenHelper';
+} from "../services/googleSheetsService";
+import { asyncHandler } from "../utils/asyncHandler";
+import {
+  sendSuccess,
+  sendError,
+  sendValidationError,
+  sendNotFound,
+} from "../utils/responseHelper";
+import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 /**
  * Get questions for a technology
  */
-export const getQuestionsByTechnology = asyncHandler(async (req: Request, res: Response) => {
-  const { technologyName } = req.params;
-  const googleToken = getGoogleTokenFromRequest(req);
-  const questions = await getQuestions(technologyName, googleToken);
-  return sendSuccess(res, questions);
-});
+export const getQuestionsByTechnology = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { technologyName } = req.params;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const questions = await getQuestions(technologyName, googleToken);
+    return sendSuccess(res, questions);
+  },
+);
 
 /**
  * Add a question
  */
-export const addQuestionHandler = asyncHandler(async (req: Request, res: Response) => {
-  setUserCredentials(req.googleToken!);
-  const { technologyName } = req.params;
-  const { question, answer, imageUrls } = req.body;
+export const addQuestionHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    setUserCredentials(req.googleToken!);
+    const { technologyName } = req.params;
+    const { question, answer, imageUrls } = req.body;
 
-  if (!question || !answer) {
-    return sendValidationError(res, 'Question and answer are required');
-  }
+    if (!question || !answer) {
+      return sendValidationError(res, "Question and answer are required");
+    }
 
-  const success = await addQuestion(technologyName, {
-    question,
-    answer,
-    imageUrls,
-  });
+    const success = await addQuestion(technologyName, {
+      question,
+      answer,
+      imageUrls,
+    });
 
-  if (success) {
-    return sendSuccess(res, null, 'Question added successfully');
-  } else {
-    return sendError(res, 'Failed to add question', 500);
-  }
-});
+    if (success) {
+      return sendSuccess(res, null, "Question added successfully");
+    } else {
+      return sendError(res, "Failed to add question", 500);
+    }
+  },
+);
 
 /**
  * Update a question
  */
-export const updateQuestionHandler = asyncHandler(async (req: Request, res: Response) => {
-  setUserCredentials(req.googleToken!);
-  const { technologyName, rowIndex } = req.params;
-  const { question, answer, imageUrls } = req.body;
+export const updateQuestionHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    setUserCredentials(req.googleToken!);
+    const { technologyName, rowIndex } = req.params;
+    const { question, answer, imageUrls } = req.body;
 
-  if (!question || !answer) {
-    return sendValidationError(res, 'Question and answer are required');
-  }
+    if (!question || !answer) {
+      return sendValidationError(res, "Question and answer are required");
+    }
 
-  const success = await updateQuestion(
-    technologyName,
-    parseInt(rowIndex),
-    { question, answer, imageUrls }
-  );
+    const success = await updateQuestion(technologyName, parseInt(rowIndex), {
+      question,
+      answer,
+      imageUrls,
+    });
 
-  if (success) {
-    return sendSuccess(res, null, 'Question updated successfully');
-  } else {
-    return sendError(res, 'Failed to update question', 500);
-  }
-});
+    if (success) {
+      return sendSuccess(res, null, "Question updated successfully");
+    } else {
+      return sendError(res, "Failed to update question", 500);
+    }
+  },
+);
 
 /**
  * Delete a question
  */
-export const deleteQuestionHandler = asyncHandler(async (req: Request, res: Response) => {
-  setUserCredentials(req.googleToken!);
-  const { technologyName, rowIndex } = req.params;
+export const deleteQuestionHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    setUserCredentials(req.googleToken!);
+    const { technologyName, rowIndex } = req.params;
 
-  // Get sheet ID for the technology
-  const technologies = await getTechnologies(req.googleToken!);
-  const tech = technologies.find((t) => t.name === technologyName);
+    // Get sheet ID for the technology
+    const technologies = await getTechnologies(req.googleToken!);
+    const tech = technologies.find((t) => t.name === technologyName);
 
-  if (!tech || tech.sheetId === undefined) {
-    return sendNotFound(res, 'Technology');
-  }
+    if (!tech || tech.sheetId === undefined) {
+      return sendNotFound(res, "Technology");
+    }
 
-  const success = await deleteQuestion(
-    technologyName,
-    parseInt(rowIndex),
-    tech.sheetId,
-    req.googleToken!
-  );
+    const success = await deleteQuestion(
+      technologyName,
+      parseInt(rowIndex),
+      tech.sheetId,
+      req.googleToken!,
+    );
 
-  if (success) {
-    return sendSuccess(res, null, 'Question and associated images deleted successfully');
-  } else {
-    return sendError(res, 'Failed to delete question', 500);
-  }
-});
+    if (success) {
+      return sendSuccess(
+        res,
+        null,
+        "Question and associated images deleted successfully",
+      );
+    } else {
+      return sendError(res, "Failed to delete question", 500);
+    }
+  },
+);
 
 /**
  * Reorder questions
  */
-export const reorderQuestionsHandler = asyncHandler(async (req: Request, res: Response) => {
-  setUserCredentials(req.googleToken!);
-  const { technologyName } = req.params;
-  const { oldIndex, newIndex } = req.body;
+export const reorderQuestionsHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    setUserCredentials(req.googleToken!);
+    const { technologyName } = req.params;
+    const { oldIndex, newIndex } = req.body;
 
-  if (
-    oldIndex === undefined ||
-    newIndex === undefined ||
-    typeof oldIndex !== 'number' ||
-    typeof newIndex !== 'number'
-  ) {
-    return sendValidationError(res, 'oldIndex and newIndex are required numbers');
-  }
+    if (
+      oldIndex === undefined ||
+      newIndex === undefined ||
+      typeof oldIndex !== "number" ||
+      typeof newIndex !== "number"
+    ) {
+      return sendValidationError(
+        res,
+        "oldIndex and newIndex are required numbers",
+      );
+    }
 
-  // Get sheet ID for the technology
-  const technologies = await getTechnologies(req.googleToken!);
-  const tech = technologies.find((t) => t.name === technologyName);
+    // Get sheet ID for the technology
+    const technologies = await getTechnologies(req.googleToken!);
+    const tech = technologies.find((t) => t.name === technologyName);
 
-  if (!tech || tech.sheetId === undefined) {
-    return sendNotFound(res, 'Technology');
-  }
+    if (!tech || tech.sheetId === undefined) {
+      return sendNotFound(res, "Technology");
+    }
 
-  const success = await reorderQuestions(
-    technologyName,
-    oldIndex,
-    newIndex,
-    tech.sheetId
-  );
+    const success = await reorderQuestions(
+      technologyName,
+      oldIndex,
+      newIndex,
+      tech.sheetId,
+    );
 
-  if (success) {
-    return sendSuccess(res, null, 'Questions reordered successfully');
-  } else {
-    return sendError(res, 'Failed to reorder questions', 500);
-  }
-});
-
-
+    if (success) {
+      return sendSuccess(res, null, "Questions reordered successfully");
+    } else {
+      return sendError(res, "Failed to reorder questions", 500);
+    }
+  },
+);

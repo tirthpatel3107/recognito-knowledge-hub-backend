@@ -1,49 +1,51 @@
 /**
  * Practical Tasks Routes
  */
-import express from 'express';
-import { authenticateToken, authenticateGoogleToken } from '../middleware/auth';
-import * as practicalTasksController from '../controllers/practicalTasksController';
+import express from "express";
+import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import * as practicalTasksController from "../controllers/practicalTasksController";
 
 const router = express.Router();
 
 // Get all practical tasks (read-only, but supports OAuth if available)
-router.get('/', practicalTasksController.getAllPracticalTasks);
+router.get("/", practicalTasksController.getAllPracticalTasks);
 
 // Get practical tasks for a technology (read-only, but supports OAuth if available)
-router.get('/:technologyName', practicalTasksController.getPracticalTasksByTechnologyHandler);
+router.get(
+  "/:technologyName",
+  practicalTasksController.getPracticalTasksByTechnologyHandler,
+);
 
 // Add practical task (requires Google auth)
 router.post(
-  '/:technologyName',
+  "/:technologyName",
   authenticateToken,
   authenticateGoogleToken,
-  practicalTasksController.addPracticalTaskHandler
+  practicalTasksController.addPracticalTaskHandler,
 );
 
 // Update practical task (requires Google auth)
 router.put(
-  '/:technologyName/:rowIndex',
+  "/:technologyName/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
-  practicalTasksController.updatePracticalTaskHandler
+  practicalTasksController.updatePracticalTaskHandler,
 );
 
 // Delete practical task (requires Google auth)
 router.delete(
-  '/:technologyName/:rowIndex',
+  "/:technologyName/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
-  practicalTasksController.deletePracticalTaskHandler
+  practicalTasksController.deletePracticalTaskHandler,
 );
 
 // Reorder practical tasks (requires Google auth)
 router.post(
-  '/:technologyName/reorder',
+  "/:technologyName/reorder",
   authenticateToken,
   authenticateGoogleToken,
-  practicalTasksController.reorderPracticalTasksHandler
+  practicalTasksController.reorderPracticalTasksHandler,
 );
 
 export default router;
-

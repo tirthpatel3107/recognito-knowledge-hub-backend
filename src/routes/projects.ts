@@ -1,46 +1,45 @@
 /**
  * Projects Routes
  */
-import express from 'express';
-import { authenticateToken, authenticateGoogleToken } from '../middleware/auth';
-import * as projectsController from '../controllers/projectsController';
+import express from "express";
+import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import * as projectsController from "../controllers/projectsController";
 
 const router = express.Router();
 
 // Get all projects (read-only, but supports OAuth if available)
-router.get('/', projectsController.getAllProjects);
+router.get("/", projectsController.getAllProjects);
 
 // Add project (requires Google auth)
 router.post(
-  '/',
+  "/",
   authenticateToken,
   authenticateGoogleToken,
-  projectsController.addProjectHandler
+  projectsController.addProjectHandler,
 );
 
 // Update project (requires Google auth)
 router.put(
-  '/:rowIndex',
+  "/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
-  projectsController.updateProjectHandler
+  projectsController.updateProjectHandler,
 );
 
 // Delete project (requires Google auth)
 router.delete(
-  '/:rowIndex',
+  "/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
-  projectsController.deleteProjectHandler
+  projectsController.deleteProjectHandler,
 );
 
 // Reorder projects (requires Google auth)
 router.post(
-  '/reorder',
+  "/reorder",
   authenticateToken,
   authenticateGoogleToken,
-  projectsController.reorderProjectsHandler
+  projectsController.reorderProjectsHandler,
 );
 
 export default router;
-

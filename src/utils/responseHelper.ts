@@ -2,7 +2,7 @@
  * Response Helper Utility
  * Provides standardized response methods for controllers
  */
-import { Response } from 'express';
+import { Response } from "express";
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -18,7 +18,7 @@ export const sendSuccess = <T>(
   res: Response,
   data: T,
   message?: string,
-  statusCode: number = 200
+  statusCode: number = 200,
 ): Response => {
   const response: ApiResponse<T> = {
     success: true,
@@ -37,7 +37,7 @@ export const sendError = (
   res: Response,
   error: string,
   statusCode: number = 500,
-  details?: any
+  details?: any,
 ): Response => {
   const response: ApiResponse = {
     success: false,
@@ -55,7 +55,7 @@ export const sendError = (
 export const sendValidationError = (
   res: Response,
   error: string,
-  details?: any
+  details?: any,
 ): Response => {
   return sendError(res, error, 400, details);
 };
@@ -63,14 +63,19 @@ export const sendValidationError = (
 /**
  * Send a not found error response
  */
-export const sendNotFound = (res: Response, resource: string = 'Resource'): Response => {
+export const sendNotFound = (
+  res: Response,
+  resource: string = "Resource",
+): Response => {
   return sendError(res, `${resource} not found`, 404);
 };
 
 /**
  * Send an unauthorized error response
  */
-export const sendUnauthorized = (res: Response, message: string = 'Unauthorized'): Response => {
+export const sendUnauthorized = (
+  res: Response,
+  message: string = "Unauthorized",
+): Response => {
   return sendError(res, message, 401);
 };
-

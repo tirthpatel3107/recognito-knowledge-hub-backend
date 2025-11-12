@@ -2,10 +2,10 @@
  * Authentication Middleware
  * Validates JWT tokens and extracts user information
  */
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { getServiceConfigValue } from '../config/googleConfig';
-import { getGoogleToken } from '../services/googleTokenStore';
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import { getServiceConfigValue } from "../config/googleConfig";
+import { getGoogleToken } from "../services/googleTokenStore";
 
 interface UserPayload {
   email: string;
@@ -21,28 +21,28 @@ declare global {
 }
 
 const getJwtSecret = (): string | null => {
-  const secret = getServiceConfigValue('JWT_SECRET');
-  return typeof secret === 'string' ? secret : null;
+  const secret = getServiceConfigValue("JWT_SECRET");
+  return typeof secret === "string" ? secret : null;
 };
 
 export const authenticateToken = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   const jwtSecret = getJwtSecret();
 
   if (!jwtSecret) {
     // JWT secret is not configured in the Config sheet
-    res.status(500).json({ error: 'Server configuration error' });
+    res.status(500).json({ error: "Server configuration error" });
     return;
   }
 
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
-    res.status(401).json({ error: 'Access token required' });
+    res.status(401).json({ error: "Access token required" });
     return;
   }
 
@@ -52,18 +52,19 @@ export const authenticateToken = (
     next();
   } catch (error: any) {
     // Token verification failed
-    res.status(403).json({ error: 'Invalid or expired token' });
+    res.status(403).json({ error: "Invalid or expired token" });
   }
 };
 
 export const authenticateGoogleToken = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   let googleToken =
-    (req.headers['x-google-token'] as string) ||
-    (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
+    (req.headers["x-google-token"] as string) ||
+    (req.headers["authorization"] &&
+      req.headers["authorization"].split(" ")[1]);
 
   if (!googleToken && req.user && req.user.email) {
     googleToken = getGoogleToken(req.user.email) || undefined;
@@ -72,11 +73,10 @@ export const authenticateGoogleToken = (
   if (!googleToken) {
     res
       .status(401)
-      .json({ error: 'Google access token required for write operations' });
+      .json({ error: "Google access token required for write operations" });
     return;
   }
 
   req.googleToken = googleToken;
   next();
 };
-
