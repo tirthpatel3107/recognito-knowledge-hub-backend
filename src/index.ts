@@ -14,15 +14,16 @@ const __dirname = dirname(__filename);
 
 // Load .env file from the backend root directory (parent of src)
 const envPath = join(__dirname, "..", ".env");
+console.log(`[Backend] Loading environment variables from: ${envPath}`);
 dotenv.config({ path: envPath });
 
 // Verify LOGIN_SPREADSHEET_ID is loaded
 if (!process.env?.LOGIN_SPREADSHEET_ID) {
-  // WARNING: LOGIN_SPREADSHEET_ID is not set in environment variables
-  // Looking for .env file at: {envPath}
-  // Please ensure .env file exists and contains LOGIN_SPREADSHEET_ID
+  console.warn(`[Backend] WARNING: LOGIN_SPREADSHEET_ID is not set in environment variables`);
+  console.warn(`[Backend] Looking for .env file at: ${envPath}`);
+  console.warn(`[Backend] Please ensure .env file exists and contains LOGIN_SPREADSHEET_ID`);
 } else {
-  // LOGIN_SPREADSHEET_ID loaded from .env file
+  console.log(`[Backend] LOGIN_SPREADSHEET_ID loaded from .env file`);
 }
 
 // Import routes
@@ -46,7 +47,14 @@ const app = express();
 const PORT = Number(getServiceConfigValue("PORT")) || 3001;
 
 // Initialize Google Sheets service (will be refreshed after config loads)
-initializeGoogleSheets();
+console.log(`[Backend] Initializing Google Sheets service...`);
+try {
+  initializeGoogleSheets();
+  console.log(`[Backend] Google Sheets service initialized successfully`);
+} catch (error) {
+  console.error(`[Backend] ERROR: Failed to initialize Google Sheets service:`, error);
+  throw error;
+}
 
 // CORS configuration - Allow all origins (no restrictions)
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -111,6 +119,7 @@ app.get("/health", (req: Request, res: Response) => {
 });
 
 // API Routes
+console.log(`[Backend] Registering API routes...`);
 app.use("/api/auth", authRoutes);
 app.use("/api/technologies", technologiesRoutes);
 app.use("/api/questions", questionsRoutes);
@@ -120,6 +129,7 @@ app.use("/api/practical-tasks", practicalTasksRoutes);
 app.use("/api/practical-task-technologies", practicalTaskTechnologiesRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/tags", tagsRoutes);
+console.log(`[Backend] All API routes registered successfully`);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -130,6 +140,25 @@ app.use((req: Request, res: Response) => {
 app.use(errorHandler);
 
 // Start server
-app.listen(PORT, () => {
-  // Server is running on http://localhost:{PORT}
+console.log(`[Backend] Starting server on port ${PORT}...`);
+try {
+  app.listen(PORT, () => {
+    console.log(`[Backend] ✅ Server started successfully!`);
+    console.log(`[Backend] Server is running on http://localhost:${PORT}`);
+    console.log(`[Backend] Health check available at http://localhost:${PORT}/health`);
+  });
+} catch (error) {
+  console.error(`[Backend] ❌ ERROR: Failed to start server:`, error);
+  process.exit(1);
+}
+
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+  console.error(`[Backend] ❌ UNCAUGHT EXCEPTION:`, error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error(`[Backend] ❌ UNHANDLED REJECTION at:`, promise, `reason:`, reason);
+  process.exit(1);
 });
