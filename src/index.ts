@@ -36,6 +36,7 @@ import practicalTasksRoutes from "./routes/practicalTasks.js";
 import practicalTaskTechnologiesRoutes from "./routes/practicalTaskTechnologies.js";
 import userRoutes from "./routes/user.js";
 import tagsRoutes from "./routes/tags.js";
+import codeEditorRoutes from "./routes/codeEditor.js";
 
 // Import services to initialize
 import { initializeGoogleSheets } from "./services/googleSheetsService.js";
@@ -129,6 +130,7 @@ app.use("/api/practical-tasks", practicalTasksRoutes);
 app.use("/api/practical-task-technologies", practicalTaskTechnologiesRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/tags", tagsRoutes);
+app.use("/api/code-editor", codeEditorRoutes);
 console.log(`[Backend] All API routes registered successfully`);
 
 // 404 handler

@@ -16,19 +16,20 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0",
+    "@google/generative-ai": "^0.24.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
+    "express": "^5.1.0",
     "googleapis": "^165.0.0",
-    "jsonwebtoken": "^9.0.2",
-    "cookie-parser": "^1.4.7"
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
-    "@types/node": "^24.10.0",
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/cookie-parser": "^1.4.10",
-    "typescript": "^5.9.3",
-    "tsx": "^4.20.6"
+    "@types/node": "^24.10.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }
