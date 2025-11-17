@@ -28,7 +28,20 @@ export const getQuestionsByTechnology = asyncHandler(
   async (req: Request, res: Response) => {
     const { technologyName } = req.params;
     const googleToken = getGoogleTokenFromRequest(req);
-    const questions = await getQuestions(technologyName, googleToken);
+    
+    // Parse pagination parameters from query string
+    const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+    
+    // Validate pagination parameters
+    if (page !== undefined && (isNaN(page) || page < 1)) {
+      return sendValidationError(res, "Page must be a positive integer");
+    }
+    if (limit !== undefined && (isNaN(limit) || limit < 1)) {
+      return sendValidationError(res, "Limit must be a positive integer");
+    }
+    
+    const questions = await getQuestions(technologyName, googleToken, page, limit);
     return sendSuccess(res, questions);
   },
 );

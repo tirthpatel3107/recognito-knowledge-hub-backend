@@ -667,6 +667,17 @@ const ensureQuestionBankHeaders = async (
 };
 
 /**
+ * Paginated response type
+ */
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
  * Get questions for a technology
  * Handles text that may be split across multiple columns
  * Structure: A=Serial, B=Q1, C=A1, D=Images1, E=FirstImage1, F=Q2, G=A2, H=Images2, I=FirstImage2, ...
@@ -674,7 +685,9 @@ const ensureQuestionBankHeaders = async (
 export const getQuestions = async (
   technologyName: string,
   accessToken: string | null = null,
-): Promise<Question[]> => {
+  page?: number,
+  limit?: number,
+): Promise<Question[] | PaginatedResponse<Question>> => {
   // Ensure headers exist before reading data
   await ensureQuestionBankHeaders(technologyName, accessToken);
 
@@ -687,7 +700,7 @@ export const getQuestions = async (
     });
 
     const rows = response?.data?.values || [];
-    return rows.map((row: any[], index: number) => {
+    const allQuestions = rows.map((row: any[], index: number) => {
       // Reconstruct question, answer, imageUrls, and firstImage from multiple columns
       // Each group is 4 columns: [Q, A, Images, FirstImage]
       let question = "";
@@ -769,8 +782,37 @@ export const getQuestions = async (
         imageUrls,
       };
     });
+
+    // If pagination parameters are provided, return paginated response
+    if (page !== undefined && limit !== undefined) {
+      const total = allQuestions.length;
+      const totalPages = Math.ceil(total / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = allQuestions.slice(startIndex, endIndex);
+
+      return {
+        data: paginatedData,
+        total,
+        page,
+        limit,
+        totalPages,
+      };
+    }
+
+    // Otherwise return all questions (backward compatibility)
+    return allQuestions;
   } catch (error) {
     // Error getting questions
+    if (page !== undefined && limit !== undefined) {
+      return {
+        data: [],
+        total: 0,
+        page: page || 1,
+        limit: limit || 100,
+        totalPages: 0,
+      };
+    }
     return [];
   }
 };
@@ -2425,7 +2467,9 @@ const ensurePracticalTaskHeaders = async (
 export const getPracticalTasksByTechnology = async (
   technologyName: string,
   accessToken: string | null = null,
-): Promise<PracticalTask[]> => {
+  page?: number,
+  limit?: number,
+): Promise<PracticalTask[] | PaginatedResponse<PracticalTask>> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
@@ -2434,7 +2478,7 @@ export const getPracticalTasksByTechnology = async (
     });
 
     const rows = response?.data?.values || [];
-    return rows.map((row: any[], index: number) => {
+    const allTasks = rows.map((row: any[], index: number) => {
       // Handle chunked data similar to questions
       let question = "";
       let answer = "";
@@ -2455,12 +2499,50 @@ export const getPracticalTasksByTechnology = async (
         image: image || row[3] || "", // Fallback to column D if no chunks
       };
     });
+
+    // If pagination parameters are provided, return paginated response
+    if (page !== undefined && limit !== undefined) {
+      const total = allTasks.length;
+      const totalPages = Math.ceil(total / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = allTasks.slice(startIndex, endIndex);
+
+      return {
+        data: paginatedData,
+        total,
+        page,
+        limit,
+        totalPages,
+      };
+    }
+
+    // Otherwise return all tasks (backward compatibility)
+    return allTasks;
   } catch (error: any) {
     if (error?.message?.includes("Unable to parse range")) {
       // Sheet doesn't exist yet, return empty array
+      if (page !== undefined && limit !== undefined) {
+        return {
+          data: [],
+          total: 0,
+          page: page || 1,
+          limit: limit || 100,
+          totalPages: 0,
+        };
+      }
       return [];
     }
     // Error getting practical tasks by technology
+    if (page !== undefined && limit !== undefined) {
+      return {
+        data: [],
+        total: 0,
+        page: page || 1,
+        limit: limit || 100,
+        totalPages: 0,
+      };
+    }
     return [];
   }
 };
