@@ -1001,8 +1001,13 @@ export const deleteQuestion = async (
     // Update serial numbers for all remaining questions after deletion
     const updatedQuestions = await getQuestions(technologyName, accessToken);
 
+    // Normalize to array (handle both Question[] and PaginatedResponse<Question>)
+    const questionsArray = Array.isArray(updatedQuestions) 
+      ? updatedQuestions 
+      : updatedQuestions.data;
+
     // Build updates for serial numbers in column A
-    const updates = updatedQuestions.map((q, index) => ({
+    const updates = questionsArray.map((q:any, index:any) => ({
       range: `${technologyName}!A${index + 2}`, // +2 for header and 1-based index
       values: [[index + 1]], // Serial number
     }));
@@ -1070,8 +1075,13 @@ export const reorderQuestions = async (
     // Update serial numbers for all questions after the move
     const updatedQuestions = await getQuestions(technologyName);
 
+    // Normalize to array (handle both Question[] and PaginatedResponse<Question>)
+    const questionsArray = Array.isArray(updatedQuestions) 
+      ? updatedQuestions 
+      : updatedQuestions.data;
+
     // Build updates for serial numbers in column A
-    const updates = updatedQuestions.map((q, index) => ({
+    const updates = questionsArray.map((q:any, index:any) => ({
       range: `${technologyName}!A${index + 2}`, // +2 for header and 1-based index
       values: [[index + 1]], // Serial number
     }));
@@ -2799,8 +2809,13 @@ export const reorderPracticalTasks = async (
     // Update serial numbers for all tasks after the move
     const updatedTasks = await getPracticalTasksByTechnology(technologyName);
 
+    // Normalize to array (handle both PracticalTask[] and PaginatedResponse<PracticalTask>)
+    const tasksArray = Array.isArray(updatedTasks) 
+      ? updatedTasks 
+      : updatedTasks.data;
+
     // Build updates for serial numbers in column A
-    const updates = updatedTasks.map((task, index) => ({
+    const updates = tasksArray.map((task:any, index:any) => ({
       range: `${technologyName}!A${index + 2}`, // +2 for header and 1-based index
       values: [[index + 1]], // Serial number
     }));
