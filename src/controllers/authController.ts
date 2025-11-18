@@ -89,6 +89,24 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const signOptions: any = { expiresIn: jwtExpiresIn };
   const token = jwt.sign({ email }, jwtSecret, signOptions);
 
+  // Set httpOnly cookie for enhanced security (prevents XSS attacks)
+  // Cookie expires based on JWT expiration
+  const maxAge = jwtExpiresIn.includes("h")
+    ? parseInt(jwtExpiresIn) * 60 * 60 * 1000
+    : jwtExpiresIn.includes("d")
+      ? parseInt(jwtExpiresIn) * 24 * 60 * 60 * 1000
+      : 24 * 60 * 60 * 1000; // Default 24 hours
+
+  res.cookie("authToken", token, {
+    httpOnly: true, // Prevents JavaScript access (XSS protection)
+    secure: process.env.NODE_ENV === "production", // HTTPS only in production
+    sameSite: "strict", // CSRF protection
+    maxAge: maxAge,
+    path: "/",
+  });
+
+  // Also return token in response for backward compatibility
+  // Frontend should prefer using the cookie in future versions
   return sendSuccess(res, { token, email }, "Login successful");
 });
 
@@ -192,3 +210,24 @@ export const refreshToken = asyncHandler(
     return sendError(res, "Not implemented", 501);
   },
 );
+
+/**
+ * Logout endpoint - clears authentication cookie
+ */
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  // Clear the httpOnly cookie
+  res.clearCookie("authToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+  });
+
+  // If user is authenticated, clear their Google token from server memory
+  if (req.user?.email) {
+    const { clearGoogleToken } = await import("../services/googleTokenStore");
+    clearGoogleToken(req.user.email);
+  }
+
+  return sendSuccess(res, null, "Logged out successfully");
+});

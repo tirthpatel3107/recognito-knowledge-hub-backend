@@ -42,6 +42,8 @@ import codeEditorRoutes from "./routes/codeEditor.js";
 import { initializeGoogleSheets } from "./services/googleSheetsService.js";
 import { getServiceConfigValue } from "./config/googleConfig.js";
 import { errorHandler } from "./utils/errorHandler.js";
+import { securityHeaders, customSecurityHeaders } from "./middleware/securityHeaders.js";
+import { apiLimiter } from "./middleware/rateLimiter.js";
 
 const app = express();
 
@@ -97,6 +99,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+// Security headers middleware (must be early in the middleware chain)
+app.use(securityHeaders);
+app.use(customSecurityHeaders);
+
 // Disable ETags to prevent 304 responses - we always want status 200 with actual data
 app.set("etag", false);
 
@@ -108,6 +114,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader("Expires", "0");
   next();
 });
+
+// Apply rate limiting to all API routes
+app.use("/api", apiLimiter);
 
 // Increase body size limit to handle large base64 images (10MB limit)
 app.use(express.json({ limit: "10mb" }));
