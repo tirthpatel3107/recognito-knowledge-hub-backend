@@ -13,7 +13,7 @@ export const validate = (
   req: Request,
   res: Response,
   next: NextFunction,
-): void => {
+): Response | void => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const errorMessages = errors
