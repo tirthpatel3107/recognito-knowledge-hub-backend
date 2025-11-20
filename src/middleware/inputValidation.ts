@@ -2,7 +2,13 @@
  * Input Validation Middleware
  * Validates and sanitizes user input to prevent injection attacks
  */
-import { body, param, query, ValidationChain, validationResult } from "express-validator";
+import {
+  body,
+  param,
+  query,
+  ValidationChain,
+  validationResult,
+} from "express-validator";
 import { Request, Response, NextFunction } from "express";
 import { sendValidationError } from "../utils/responseHelper";
 
@@ -49,10 +55,7 @@ export const validateLogin = [
  * Validation rules for Google token verification
  */
 export const validateGoogleToken = [
-  body("accessToken")
-    .trim()
-    .notEmpty()
-    .withMessage("Access token is required"),
+  body("accessToken").trim().notEmpty().withMessage("Access token is required"),
   body("expectedEmail")
     .optional()
     .trim()
@@ -136,10 +139,7 @@ export const validateWorkSummary = [
  * Validation rules for ID parameters
  */
 export const validateId = [
-  param("id")
-    .trim()
-    .matches(/^\d+$/)
-    .withMessage("ID must be a valid number"),
+  param("id").trim().matches(/^\d+$/).withMessage("ID must be a valid number"),
   validate,
 ];
 
@@ -230,4 +230,3 @@ export const sanitizeString = (input: string): string => {
 export const sanitizeEmail = (input: string): string => {
   return input.trim().toLowerCase().substring(0, 255);
 };
-

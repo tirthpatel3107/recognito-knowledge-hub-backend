@@ -3,7 +3,6 @@
  * Handles project-related operations
  */
 import { Request, Response } from "express";
-import { google } from "googleapis";
 import {
   getProjects,
   addProject,
@@ -11,8 +10,9 @@ import {
   deleteProject,
   reorderProjects,
   setUserCredentials,
-} from "../services/googleSheetsService";
-import { GOOGLE_CONFIG, SPREADSHEET_IDS } from "../config/googleConfig";
+  getSheetsClient,
+} from "../services/googleSheets";
+import { SPREADSHEET_IDS } from "../config/googleConfig";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
@@ -22,24 +22,6 @@ import {
 } from "../utils/responseHelper";
 import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
-const buildSheetsClient = (accessToken: string | null = null) => {
-  if (accessToken) {
-    const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CONFIG.CLIENT_ID,
-      GOOGLE_CONFIG.CLIENT_SECRET,
-      GOOGLE_CONFIG.REDIRECT_URI,
-    );
-    oauth2Client.setCredentials({ access_token: accessToken });
-    return google.sheets({ version: "v4", auth: oauth2Client });
-  }
-
-  if (!GOOGLE_CONFIG.API_KEY) {
-    throw new Error("Google API key is not configured for read-only access");
-  }
-
-  return google.sheets({ version: "v4", auth: GOOGLE_CONFIG.API_KEY });
-};
-
 // Helper to get sheet ID for "Project List" sheet
 // Note: Project List sheet (tab) is inside the WORK_SUMMARY spreadsheet, not PROJECT_LISTING
 // This uses the same search logic as the service layer for consistency
@@ -47,7 +29,7 @@ const getProjectListSheetId = async (
   accessToken: string | null = null,
 ): Promise<{ sheetId?: number; availableSheets?: string[] }> => {
   try {
-    const sheetsClient = buildSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(accessToken);
 
     if (!SPREADSHEET_IDS.WORK_SUMMARY) {
       // WORK_SUMMARY spreadsheet ID is not configured
@@ -70,14 +52,14 @@ const getProjectListSheetId = async (
 
     // Strategy 1: Exact case-sensitive match
     projectListSheet = sheetsList.find(
-      (sheet) => sheet.properties?.title === "Project List",
+      (sheet: any) => sheet.properties?.title === "Project List",
     );
 
     if (projectListSheet) {
       // Found Project List sheet using exact case-sensitive match
     } else {
       // Strategy 2: Case-insensitive match with normalized whitespace
-      projectListSheet = sheetsList.find((sheet) => {
+      projectListSheet = sheetsList.find((sheet: any) => {
         const title = sheet.properties?.title || "";
         const normalized = title.replace(/\s+/g, " ").trim().toLowerCase();
         return normalized === "project list";
@@ -87,7 +69,7 @@ const getProjectListSheetId = async (
         // Found Project List sheet using normalized case-insensitive match
       } else {
         // Strategy 3: Partial match (contains both words)
-        projectListSheet = sheetsList.find((sheet) => {
+        projectListSheet = sheetsList.find((sheet: any) => {
           const title = (sheet.properties?.title || "").toLowerCase();
           return title.includes("project") && title.includes("list");
         });

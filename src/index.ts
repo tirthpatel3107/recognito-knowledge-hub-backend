@@ -19,9 +19,13 @@ dotenv.config({ path: envPath });
 
 // Verify LOGIN_SPREADSHEET_ID is loaded
 if (!process.env?.LOGIN_SPREADSHEET_ID) {
-  console.warn(`[Backend] WARNING: LOGIN_SPREADSHEET_ID is not set in environment variables`);
+  console.warn(
+    `[Backend] WARNING: LOGIN_SPREADSHEET_ID is not set in environment variables`,
+  );
   console.warn(`[Backend] Looking for .env file at: ${envPath}`);
-  console.warn(`[Backend] Please ensure .env file exists and contains LOGIN_SPREADSHEET_ID`);
+  console.warn(
+    `[Backend] Please ensure .env file exists and contains LOGIN_SPREADSHEET_ID`,
+  );
 } else {
   console.log(`[Backend] LOGIN_SPREADSHEET_ID loaded from .env file`);
 }
@@ -39,10 +43,13 @@ import tagsRoutes from "./routes/tags.js";
 import codeEditorRoutes from "./routes/codeEditor.js";
 
 // Import services to initialize
-import { initializeGoogleSheets } from "./services/googleSheetsService.js";
+import { initializeGoogleSheets } from "./services/googleSheets/index.js";
 import { getServiceConfigValue } from "./config/googleConfig.js";
 import { errorHandler } from "./utils/errorHandler.js";
-import { securityHeaders, customSecurityHeaders } from "./middleware/securityHeaders.js";
+import {
+  securityHeaders,
+  customSecurityHeaders,
+} from "./middleware/securityHeaders.js";
 import { apiLimiter } from "./middleware/rateLimiter.js";
 
 const app = express();
@@ -55,7 +62,10 @@ try {
   initializeGoogleSheets();
   console.log(`[Backend] Google Sheets service initialized successfully`);
 } catch (error) {
-  console.error(`[Backend] ERROR: Failed to initialize Google Sheets service:`, error);
+  console.error(
+    `[Backend] ERROR: Failed to initialize Google Sheets service:`,
+    error,
+  );
   throw error;
 }
 
@@ -63,14 +73,8 @@ try {
 app.use((req: Request, res: Response, next: NextFunction) => {
   const origin = req.headers.origin;
 
-  // CORS requests tracking (no logging in production)
-  if (req.method === "OPTIONS" || req.method === "POST") {
-    // CORS request from origin: {origin || 'none'}
-  }
-
   // Handle preflight OPTIONS requests
   if (req.method === "OPTIONS") {
-    // Allow any origin - set to requesting origin (required when credentials are true)
     if (origin) {
       res.setHeader("Access-Control-Allow-Origin", origin);
     }
@@ -84,11 +88,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       "Content-Type, Authorization, X-Google-Token, X-Requested-With, Accept, Cache-Control, Pragma, Expires",
     );
     res.setHeader("Access-Control-Max-Age", "86400"); // 24 hours
-    // CORS preflight approved for origin: {origin || 'all'}
     return res.status(200).end();
   }
 
-  // For non-OPTIONS requests, set CORS headers to allow any origin
+  // For non-OPTIONS requests, set CORS headers
   // Note: When credentials are true, we must set specific origin, not '*'
   if (origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
@@ -108,7 +111,6 @@ app.set("etag", false);
 
 // Middleware to add cache-control headers to prevent 304 responses
 app.use((req: Request, res: Response, next: NextFunction) => {
-  // Always set cache-control headers to prevent 304 responses
   res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
@@ -156,7 +158,9 @@ try {
   app.listen(PORT, () => {
     console.log(`[Backend] ✅ Server started successfully!`);
     console.log(`[Backend] Server is running on http://localhost:${PORT}`);
-    console.log(`[Backend] Health check available at http://localhost:${PORT}/health`);
+    console.log(
+      `[Backend] Health check available at http://localhost:${PORT}/health`,
+    );
   });
 } catch (error) {
   console.error(`[Backend] ❌ ERROR: Failed to start server:`, error);
@@ -164,12 +168,17 @@ try {
 }
 
 // Handle uncaught errors
-process.on('uncaughtException', (error) => {
+process.on("uncaughtException", (error) => {
   console.error(`[Backend] ❌ UNCAUGHT EXCEPTION:`, error);
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error(`[Backend] ❌ UNHANDLED REJECTION at:`, promise, `reason:`, reason);
+process.on("unhandledRejection", (reason, promise) => {
+  console.error(
+    `[Backend] ❌ UNHANDLED REJECTION at:`,
+    promise,
+    `reason:`,
+    reason,
+  );
   process.exit(1);
 });

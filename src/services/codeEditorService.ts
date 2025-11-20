@@ -21,7 +21,9 @@ let genAI: GoogleGenerativeAI | null = null;
 const initializeGemini = () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.warn("[CodeEditor] GEMINI_API_KEY not found in environment variables");
+    console.warn(
+      "[CodeEditor] GEMINI_API_KEY not found in environment variables",
+    );
     return null;
   }
   try {
@@ -45,15 +47,18 @@ const getGeminiAI = () => {
 /**
  * Get file path based on project type
  */
-const getFilePath = (projectType: "frontend" | "backend", filePath: string): string => {
+const getFilePath = (
+  projectType: "frontend" | "backend",
+  filePath: string,
+): string => {
   const basePath = projectType === "frontend" ? FRONTEND_ROOT : BACKEND_ROOT;
   const resolvedPath = resolve(basePath, filePath);
-  
+
   // Security check: ensure the resolved path is within the base path
   if (!resolvedPath.startsWith(basePath)) {
     throw new Error("Invalid file path: path traversal detected");
   }
-  
+
   return resolvedPath;
 };
 
@@ -63,19 +68,25 @@ const getFilePath = (projectType: "frontend" | "backend", filePath: string): str
 export const listFiles = async (
   projectType: "frontend" | "backend",
   dirPath: string = "",
-): Promise<Array<{ name: string; type: "file" | "directory"; path: string }>> => {
+): Promise<
+  Array<{ name: string; type: "file" | "directory"; path: string }>
+> => {
   try {
     const basePath = projectType === "frontend" ? FRONTEND_ROOT : BACKEND_ROOT;
     const fullPath = dirPath ? resolve(basePath, dirPath) : basePath;
-    
+
     // Security check
     if (!fullPath.startsWith(basePath)) {
       throw new Error("Invalid directory path: path traversal detected");
     }
-    
+
     const entries = await readdir(fullPath, { withFileTypes: true });
-    const result: Array<{ name: string; type: "file" | "directory"; path: string }> = [];
-    
+    const result: Array<{
+      name: string;
+      type: "file" | "directory";
+      path: string;
+    }> = [];
+
     for (const entry of entries) {
       // Skip node_modules, dist, .git, and other build/cache directories
       if (
@@ -88,7 +99,7 @@ export const listFiles = async (
       ) {
         continue;
       }
-      
+
       const relativePath = dirPath ? join(dirPath, entry.name) : entry.name;
       result.push({
         name: entry.name,
@@ -96,7 +107,7 @@ export const listFiles = async (
         path: relativePath,
       });
     }
-    
+
     return result.sort((a, b) => {
       // Directories first, then files, both alphabetically
       if (a.type !== b.type) {
@@ -137,11 +148,13 @@ export const writeFileContent = async (
 ): Promise<void> => {
   try {
     const fullPath = getFilePath(projectType, filePath);
-    
+
     // Ensure directory exists
     const dir = dirname(fullPath);
-    await import("fs/promises").then((fs) => fs.mkdir(dir, { recursive: true }));
-    
+    await import("fs/promises").then((fs) =>
+      fs.mkdir(dir, { recursive: true }),
+    );
+
     await writeFile(fullPath, content, "utf-8");
   } catch (error) {
     console.error("[CodeEditor] Error writing file:", error);
@@ -164,16 +177,20 @@ export const getAICodeSuggestions = async (
   try {
     const ai = getGeminiAI();
     if (!ai) {
-      throw new Error("Gemini AI not initialized. Please set GEMINI_API_KEY in environment variables.");
+      throw new Error(
+        "Gemini AI not initialized. Please set GEMINI_API_KEY in environment variables.",
+      );
     }
-    
+
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
+
     const language = context?.language || "typescript";
     const filePath = context?.filePath || "unknown";
     const projectType = context?.projectType || "frontend";
-    const userPrompt = context?.userPrompt || "Analyze this code and provide suggestions for improvement.";
-    
+    const userPrompt =
+      context?.userPrompt ||
+      "Analyze this code and provide suggestions for improvement.";
+
     const prompt = `You are an expert code reviewer and assistant. Analyze the following ${language} code from ${projectType} project (file: ${filePath}).
 
 ${userPrompt}
@@ -195,11 +212,11 @@ Format your response as JSON with the following structure:
   "explanation": "Explanation of the changes or recommendations",
   "updatedCode": "The improved code (if applicable, otherwise empty string)"
 }`;
-    
+
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     // Try to parse JSON response
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -213,7 +230,7 @@ Format your response as JSON with the following structure:
     } catch {
       // If JSON parsing fails, return the raw text
     }
-    
+
     return {
       suggestions: text,
       explanation: "AI analysis completed",
@@ -239,14 +256,16 @@ export const getAICodeCompletion = async (
   try {
     const ai = getGeminiAI();
     if (!ai) {
-      throw new Error("Gemini AI not initialized. Please set GEMINI_API_KEY in environment variables.");
+      throw new Error(
+        "Gemini AI not initialized. Please set GEMINI_API_KEY in environment variables.",
+      );
     }
-    
+
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
+
     const language = context?.language || "typescript";
     const filePath = context?.filePath || "unknown";
-    
+
     const prompt = `You are a code completion assistant. Based on the following ${language} code, provide a code completion suggestion for the cursor position (line ${cursorPosition.line}, column ${cursorPosition.column}).
 
 Code:
@@ -255,7 +274,7 @@ ${code}
 \`\`\`
 
 Provide only the completion text that should be inserted at the cursor position. Do not include the existing code, only the completion.`;
-    
+
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text().trim();
@@ -264,4 +283,3 @@ Provide only the completion text that should be inserted at the cursor position.
     throw error;
   }
 };
-

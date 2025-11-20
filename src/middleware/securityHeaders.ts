@@ -17,12 +17,7 @@ export const securityHeaders = helmet({
         "https://accounts.google.com",
       ],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: [
-        "'self'",
-        "data:",
-        "https:",
-        "blob:",
-      ],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: [
         "'self'",
         "https://www.googleapis.com",
@@ -57,22 +52,21 @@ export const customSecurityHeaders = (
 ): void => {
   // Prevent clickjacking
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
-  
+
   // Prevent MIME type sniffing
   res.setHeader("X-Content-Type-Options", "nosniff");
-  
+
   // XSS Protection (legacy, but still useful)
   res.setHeader("X-XSS-Protection", "1; mode=block");
-  
+
   // Referrer Policy
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  
+
   // Permissions Policy (formerly Feature Policy)
   res.setHeader(
     "Permissions-Policy",
     "geolocation=(), microphone=(), camera=()",
   );
-  
+
   next();
 };
-

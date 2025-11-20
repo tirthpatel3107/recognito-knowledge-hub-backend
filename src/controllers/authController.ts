@@ -9,7 +9,7 @@ import {
   updateUserPhotoFromGoogle,
   setUserCredentials,
   initializeGoogleSheets,
-} from "../services/googleSheetsService";
+} from "../services/googleSheets";
 import { loadConfigFromSheet } from "../config/sheetConfigLoader";
 import {
   getServiceConfigValue,

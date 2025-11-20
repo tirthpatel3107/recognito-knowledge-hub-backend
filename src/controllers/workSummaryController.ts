@@ -3,7 +3,6 @@
  * Handles work summary-related operations
  */
 import { Request, Response } from "express";
-import { google } from "googleapis";
 import {
   getWorkSummaryMonthSheets,
   getWorkSummaryEntriesByMonth,
@@ -13,8 +12,9 @@ import {
   deleteWorkSummaryEntry,
   getMonthNameFromDate,
   setUserCredentials,
-} from "../services/googleSheetsService";
-import { GOOGLE_CONFIG, SPREADSHEET_IDS } from "../config/googleConfig";
+  getSheetsClient,
+} from "../services/googleSheets";
+import { SPREADSHEET_IDS } from "../config/googleConfig";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
@@ -24,30 +24,12 @@ import {
 } from "../utils/responseHelper";
 import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
-const buildSheetsClient = (accessToken: string | null = null) => {
-  if (accessToken) {
-    const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CONFIG.CLIENT_ID,
-      GOOGLE_CONFIG.CLIENT_SECRET,
-      GOOGLE_CONFIG.REDIRECT_URI,
-    );
-    oauth2Client.setCredentials({ access_token: accessToken });
-    return google.sheets({ version: "v4", auth: oauth2Client });
-  }
-
-  if (!GOOGLE_CONFIG.API_KEY) {
-    throw new Error("Google API key is not configured for read-only access");
-  }
-
-  return google.sheets({ version: "v4", auth: GOOGLE_CONFIG.API_KEY });
-};
-
 // Helper to get sheet ID by name
 const getSheetIdByName = async (
   sheetName: string,
   accessToken: string | null = null,
 ): Promise<number | undefined> => {
-  const sheetsClient = buildSheetsClient(accessToken);
+  const sheetsClient = getSheetsClient(accessToken);
 
   const response = await sheetsClient.spreadsheets.get({
     spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
@@ -55,7 +37,7 @@ const getSheetIdByName = async (
 
   const sheetsList = response.data.sheets || [];
   const targetSheet = sheetsList.find(
-    (sheet) => sheet.properties?.title === sheetName,
+    (sheet: any) => sheet.properties?.title === sheetName,
   );
 
   return targetSheet?.properties?.sheetId ?? undefined;

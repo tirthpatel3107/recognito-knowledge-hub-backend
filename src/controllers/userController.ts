@@ -16,7 +16,7 @@ import {
   updateUserColorPalette,
   getTabs,
   saveTabs,
-} from "../services/googleSheetsService";
+} from "../services/googleSheets";
 import { getGoogleToken } from "../services/googleTokenStore";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
@@ -288,7 +288,7 @@ export const getTabsHandler = asyncHandler(
     const email = req.user!.email;
     const googleToken = getGoogleTokenFromRequest(req);
     const tabsData = await getTabs(email, googleToken);
-    
+
     if (tabsData) {
       return sendSuccess(res, tabsData);
     } else {
@@ -312,7 +312,11 @@ export const saveTabsHandler = asyncHandler(
     }
 
     // Validate activeTabId (can be null or string)
-    if (activeTabId !== null && activeTabId !== undefined && typeof activeTabId !== "string") {
+    if (
+      activeTabId !== null &&
+      activeTabId !== undefined &&
+      typeof activeTabId !== "string"
+    ) {
       return sendValidationError(res, "activeTabId must be a string or null");
     }
 

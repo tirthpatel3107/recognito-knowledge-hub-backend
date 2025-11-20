@@ -8,18 +8,10 @@ import * as codeEditorController from "../controllers/codeEditorController";
 const router = express.Router();
 
 // List files in a directory
-router.get(
-  "/files",
-  authenticateToken,
-  codeEditorController.listFilesHandler,
-);
+router.get("/files", authenticateToken, codeEditorController.listFilesHandler);
 
 // Read file content
-router.get(
-  "/file",
-  authenticateToken,
-  codeEditorController.readFileHandler,
-);
+router.get("/file", authenticateToken, codeEditorController.readFileHandler);
 
 // Write file content (requires Google auth for write operations)
 router.post(
@@ -44,4 +36,3 @@ router.post(
 );
 
 export default router;
-

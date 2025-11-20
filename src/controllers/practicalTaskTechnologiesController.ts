@@ -11,7 +11,7 @@ import {
   reorderPracticalTaskTechnologies,
   setUserCredentials,
   authenticateUser,
-} from "../services/googleSheetsService";
+} from "../services/googleSheets";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
