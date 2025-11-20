@@ -14,6 +14,8 @@ import {
   setUserCredentials,
   getUserColorPalette,
   updateUserColorPalette,
+  getTabs,
+  saveTabs,
 } from "../services/googleSheetsService";
 import { getGoogleToken } from "../services/googleTokenStore";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -274,6 +276,52 @@ export const updateUserColorPaletteHandler = asyncHandler(
       return sendSuccess(res, null, "Color palette updated successfully");
     } else {
       return sendError(res, "Failed to update color palette", 500);
+    }
+  },
+);
+
+/**
+ * Get user tabs
+ */
+export const getTabsHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const email = req.user!.email;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const tabsData = await getTabs(email, googleToken);
+    
+    if (tabsData) {
+      return sendSuccess(res, tabsData);
+    } else {
+      // Return 404 if no tabs found
+      return sendError(res, "No tabs found", 404);
+    }
+  },
+);
+
+/**
+ * Save user tabs
+ */
+export const saveTabsHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const email = req.user!.email;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const { tabs, activeTabId } = req.body;
+
+    if (!Array.isArray(tabs)) {
+      return sendValidationError(res, "tabs must be an array");
+    }
+
+    // Validate activeTabId (can be null or string)
+    if (activeTabId !== null && activeTabId !== undefined && typeof activeTabId !== "string") {
+      return sendValidationError(res, "activeTabId must be a string or null");
+    }
+
+    const success = await saveTabs(email, tabs, activeTabId, googleToken);
+
+    if (success) {
+      return sendSuccess(res, null, "Tabs saved successfully");
+    } else {
+      return sendError(res, "Failed to save tabs", 500);
     }
   },
 );

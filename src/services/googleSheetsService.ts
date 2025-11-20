@@ -2937,6 +2937,199 @@ export const saveDashboardCardOrder = async (
 };
 
 /**
+ * Ensure Tabs sheet exists with headers
+ */
+const ensureTabsSheetExists = async (
+  accessToken: string | null = null,
+): Promise<boolean> => {
+  try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    const sheetsClient = getSheetsClient(accessToken);
+    
+    // Try to get the sheet metadata to check if it exists
+    try {
+      await sheetsClient.spreadsheets.values.get({
+        spreadsheetId: loginSpreadsheetId,
+        range: "Tabs!A1:C1",
+      });
+      // Sheet exists, check if headers are set
+      const headerResponse = await sheetsClient.spreadsheets.values.get({
+        spreadsheetId: loginSpreadsheetId,
+        range: "Tabs!A1:C1",
+      });
+      const headers = headerResponse?.data?.values?.[0];
+      
+      // If no headers, add them
+      if (!headers || headers.length === 0) {
+        await sheetsClient.spreadsheets.values.update({
+          spreadsheetId: loginSpreadsheetId,
+          range: "Tabs!A1:C1",
+          valueInputOption: "RAW",
+          requestBody: {
+            values: [["Email", "Tabs", "ActiveTabId"]],
+          },
+        });
+      }
+      return true;
+    } catch (error: any) {
+      // Sheet doesn't exist, create it
+      if (error.code === 400 || error.message?.includes("Unable to parse range")) {
+        await sheetsClient.spreadsheets.batchUpdate({
+          spreadsheetId: loginSpreadsheetId,
+          requestBody: {
+            requests: [
+              {
+                addSheet: {
+                  properties: {
+                    title: "Tabs",
+                  },
+                },
+              },
+            ],
+          },
+        });
+        
+        // Add headers
+        await sheetsClient.spreadsheets.values.update({
+          spreadsheetId: loginSpreadsheetId,
+          range: "Tabs!A1:C1",
+          valueInputOption: "RAW",
+          requestBody: {
+            values: [["Email", "Tabs", "ActiveTabId"]],
+          },
+        });
+        return true;
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error ensuring Tabs sheet exists:", error);
+    return false;
+  }
+};
+
+/**
+ * Get user tabs
+ */
+export const getTabs = async (
+  email: string,
+  accessToken: string | null = null,
+): Promise<{ tabs: any[]; activeTabId: string | null } | null> => {
+  try {
+    // Ensure sheet exists
+    await ensureTabsSheetExists(accessToken);
+    
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    const sheetsClient = getSheetsClient(accessToken);
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: loginSpreadsheetId,
+      range: "Tabs!A:C",
+    });
+
+    const rows = response?.data?.values || [];
+
+    // Find the row for the current user's email
+    for (const row of rows) {
+      if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
+        try {
+          // Parse tabs JSON from column B
+          const tabsJson = row[1] || "[]";
+          const tabs = JSON.parse(tabsJson);
+          
+          // Get activeTabId from column C (can be empty/null)
+          const activeTabId = row[2] && row[2].trim() !== "" ? row[2] : null;
+
+          return {
+            tabs: Array.isArray(tabs) ? tabs : [],
+            activeTabId: activeTabId,
+          };
+        } catch (parseError) {
+          console.error("Error parsing tabs JSON:", parseError);
+          return null;
+        }
+      }
+    }
+
+    // Return null if user not found (no tabs saved yet)
+    return null;
+  } catch (error) {
+    // Error getting tabs - return null (no tabs saved yet)
+    console.error("Error getting tabs:", error);
+    return null;
+  }
+};
+
+/**
+ * Save user tabs
+ */
+export const saveTabs = async (
+  email: string,
+  tabs: any[],
+  activeTabId: string | null,
+  accessToken: string | null = null,
+): Promise<boolean> => {
+  try {
+    // Ensure sheet exists
+    await ensureTabsSheetExists(accessToken);
+    
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    const sheetsClient = getSheetsClient(accessToken);
+
+    // First, try to find if user already has a row
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: loginSpreadsheetId,
+      range: "Tabs!A:C",
+    });
+
+    const rows = response?.data?.values || [];
+    let rowIndex = -1;
+
+    // Find the row for the current user's email
+    for (let i = 0; i < rows.length; i++) {
+      if (
+        rows[i].length > 0 &&
+        rows[i][0]?.toLowerCase() === email.toLowerCase()
+      ) {
+        rowIndex = i + 1; // +1 because sheets are 1-indexed
+        break;
+      }
+    }
+
+    // Prepare the values: [email, tabs JSON, activeTabId]
+    const tabsJson = JSON.stringify(tabs);
+    const values = [[email, tabsJson, activeTabId || ""]];
+
+    if (rowIndex > 0) {
+      // Update existing row
+      await sheetsClient.spreadsheets.values.update({
+        spreadsheetId: loginSpreadsheetId,
+        range: `Tabs!A${rowIndex}:C${rowIndex}`,
+        valueInputOption: "RAW",
+        requestBody: {
+          values: values,
+        },
+      });
+    } else {
+      // Append new row
+      await sheetsClient.spreadsheets.values.append({
+        spreadsheetId: loginSpreadsheetId,
+        range: "Tabs!A:C",
+        valueInputOption: "RAW",
+        requestBody: {
+          values: values,
+        },
+      });
+    }
+
+    return true;
+  } catch (error) {
+    // Error saving tabs
+    console.error("Error saving tabs:", error);
+    return false;
+  }
+};
+
+/**
  * Get user mode
  */
 export const getUserMode = async (
