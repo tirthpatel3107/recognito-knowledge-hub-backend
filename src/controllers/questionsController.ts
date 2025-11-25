@@ -62,7 +62,7 @@ export const addQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { technologyName } = req.params;
-    const { question, answer, imageUrls } = req.body;
+    const { question, answer, imageUrls, priority } = req.body;
 
     if (!question || !answer) {
       return sendValidationError(res, "Question and answer are required");
@@ -72,6 +72,7 @@ export const addQuestionHandler = asyncHandler(
       question,
       answer,
       imageUrls,
+      priority: priority || "low",
     });
 
     if (success) {
@@ -89,7 +90,7 @@ export const updateQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { technologyName, rowIndex } = req.params;
-    const { question, answer, imageUrls } = req.body;
+    const { question, answer, imageUrls, priority } = req.body;
 
     if (!question || !answer) {
       return sendValidationError(res, "Question and answer are required");
@@ -99,6 +100,7 @@ export const updateQuestionHandler = asyncHandler(
       question,
       answer,
       imageUrls,
+      priority: priority || "low",
     });
 
     if (success) {

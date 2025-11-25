@@ -80,6 +80,31 @@ const parseImageUrls = (imageUrlsString: string): string[] => {
 };
 
 /**
+ * Extract priority from question text and return clean question with priority
+ */
+const extractPriority = (questionText: string): { question: string; priority: "low" | "medium" | "high" } => {
+  const priorityRegex = /\|PRIORITY:(low|medium|high)\|$/;
+  const match = questionText.match(priorityRegex);
+  
+  if (match) {
+    const priority = match[1] as "low" | "medium" | "high";
+    const cleanQuestion = questionText.replace(priorityRegex, "").trim();
+    return { question: cleanQuestion, priority };
+  }
+  
+  return { question: questionText, priority: "low" };
+};
+
+/**
+ * Append priority metadata to question text
+ */
+const appendPriority = (questionText: string, priority: "low" | "medium" | "high" = "low"): string => {
+  // Remove existing priority if any
+  const cleanQuestion = questionText.replace(/\|PRIORITY:(low|medium|high)\|$/, "").trim();
+  return `${cleanQuestion}|PRIORITY:${priority}|`;
+};
+
+/**
  * Ensure Question Bank sheet has correct headers
  */
 const ensureQuestionBankHeaders = async (
@@ -130,12 +155,14 @@ export const getQuestions = async (
       }
 
       const imageUrls = parseImageUrls(imageUrlsString);
+      const { question: cleanQuestion, priority } = extractPriority(question);
 
       return {
         id: `q-${index}`,
-        question,
+        question: cleanQuestion,
         answer,
         imageUrls,
+        priority,
       };
     });
 
@@ -178,7 +205,12 @@ const buildQuestionRowData = (
   serialNumber: number,
   questionData: QuestionInput,
 ): any[] => {
-  const questionChunks = splitTextIntoChunks(questionData.question || "");
+  // Append priority to question text for storage
+  const questionWithPriority = appendPriority(
+    questionData.question || "",
+    questionData.priority || "low"
+  );
+  const questionChunks = splitTextIntoChunks(questionWithPriority);
   const answerChunks = splitTextIntoChunks(questionData.answer || "");
   const imageUrlsString = questionData.imageUrls?.join("|||") || "";
   const imageUrlsChunks = splitTextIntoChunks(imageUrlsString);
