@@ -15,7 +15,7 @@ import {
 } from "./utils";
 import type { PaginatedResponse } from "./questions";
 
-const PRACTICAL_TASK_HEADERS = ["No", "Question", "Answer", "Image"];
+const PRACTICAL_TASK_HEADERS = ["No", "Question", "Answer", "Example"];
 
 /**
  * Ensure practical task headers exist for a technology sheet
@@ -24,7 +24,7 @@ const ensurePracticalTaskHeaders = async (
   technologyName: string,
   accessToken: string | null = null,
 ): Promise<void> => {
-  await ensureSheetHeaders(
+    await ensureSheetHeaders(
     SPREADSHEET_IDS.PRACTICAL_TASKS,
     technologyName,
     PRACTICAL_TASK_HEADERS,
@@ -53,7 +53,7 @@ export const getPracticalTasks = async (
       no: row[0]?.toString() || "",
       question: row[1] || "",
       answer: row[2] || "",
-      image: row[3] || "",
+      example: row[3] || "",
     }));
   } catch (error) {
     return [];
@@ -78,23 +78,30 @@ export const getPracticalTasksByTechnology = async (
 
     const rows = response?.data?.values || [];
     const allTasks = rows.map((row: any[], index: number) => {
-      // Handle chunked data - process in groups of 3 columns
+      // Handle chunked data - process in groups of 3 columns (Question, Answer, Example)
       let question = "";
       let answer = "";
-      let image = "";
+      let example = "";
 
       for (let i = 1; i < row.length; i += 3) {
         if (row[i]) question += row[i];
         if (row[i + 1]) answer += row[i + 1];
-        if (row[i + 2]) image += row[i + 2];
+        if (row[i + 2]) example += row[i + 2];
       }
+
+      // Extract priority from question text if present
+      const priorityRegex = /\|PRIORITY:(low|medium|high)\|$/;
+      const priorityMatch = question.match(priorityRegex);
+      const priority = priorityMatch ? (priorityMatch[1] as "low" | "medium" | "high") : "low";
+      const cleanQuestion = priorityMatch ? question.replace(priorityRegex, "").trim() : question;
 
       return {
         id: `pt-${index}`,
         no: row[0]?.toString() || (index + 1).toString(),
-        question,
+        question: cleanQuestion,
         answer,
-        image: image || row[3] || "",
+        example: example || row[3] || "",
+        priority,
       };
     });
 
@@ -147,24 +154,29 @@ export const getPracticalTasksByTechnology = async (
  */
 const buildPracticalTaskRowData = (
   serialNumber: number,
-  taskData: { question: string; answer: string; image?: string },
+  taskData: { question: string; answer: string; example?: string; priority?: "low" | "medium" | "high" },
 ): any[] => {
-  const questionChunks = splitTextIntoChunks(taskData.question || "");
+  // Append priority to question if provided
+  const questionWithPriority = taskData.priority && taskData.priority !== "low"
+    ? `${taskData.question || ""}|PRIORITY:${taskData.priority}|`
+    : taskData.question || "";
+
+  const questionChunks = splitTextIntoChunks(questionWithPriority);
   const answerChunks = splitTextIntoChunks(taskData.answer || "");
-  const imageChunks = splitTextIntoChunks(taskData.image || "");
+  const exampleChunks = splitTextIntoChunks(taskData.example || "");
 
   const rowData: any[] = [serialNumber];
 
   const maxChunks = Math.max(
     questionChunks.length,
     answerChunks.length,
-    imageChunks.length,
+    exampleChunks.length,
   );
 
   for (let i = 0; i < maxChunks; i++) {
     rowData.push(questionChunks[i] || "");
     rowData.push(answerChunks[i] || "");
-    rowData.push(imageChunks[i] || "");
+    rowData.push(exampleChunks[i] || "");
   }
 
   return rowData;
@@ -175,7 +187,7 @@ const buildPracticalTaskRowData = (
  */
 export const addPracticalTask = async (
   technologyName: string,
-  taskData: { question: string; answer: string; image?: string },
+  taskData: { question: string; answer: string; example?: string; priority?: "low" | "medium" | "high" },
 ): Promise<boolean> => {
   try {
     await ensurePracticalTaskHeaders(technologyName);
@@ -211,7 +223,7 @@ export const addPracticalTask = async (
 export const updatePracticalTask = async (
   technologyName: string,
   rowIndex: number,
-  taskData: { question: string; answer: string; image?: string },
+  taskData: { question: string; answer: string; example?: string; priority?: "low" | "medium" | "high" },
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient();

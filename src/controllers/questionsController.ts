@@ -62,7 +62,7 @@ export const addQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { technologyName } = req.params;
-    const { question, answer, imageUrls, priority } = req.body;
+    const { question, answer, example, priority } = req.body;
 
     if (!question || !answer) {
       return sendValidationError(res, "Question and answer are required");
@@ -71,7 +71,7 @@ export const addQuestionHandler = asyncHandler(
     const success = await addQuestion(technologyName, {
       question,
       answer,
-      imageUrls,
+      example,
       priority: priority || "low",
     });
 
@@ -90,7 +90,7 @@ export const updateQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { technologyName, rowIndex } = req.params;
-    const { question, answer, imageUrls, priority } = req.body;
+    const { question, answer, example, priority } = req.body;
 
     if (!question || !answer) {
       return sendValidationError(res, "Question and answer are required");
@@ -99,7 +99,7 @@ export const updateQuestionHandler = asyncHandler(
     const success = await updateQuestion(technologyName, parseInt(rowIndex), {
       question,
       answer,
-      imageUrls,
+      example,
       priority: priority || "low",
     });
 
@@ -138,7 +138,7 @@ export const deleteQuestionHandler = asyncHandler(
       return sendSuccess(
         res,
         null,
-        "Question and associated images deleted successfully",
+        "Question deleted successfully",
       );
     } else {
       return sendError(res, "Failed to delete question", 500);

@@ -14,7 +14,7 @@ import {
   clearSpreadsheetMetadataCache,
 } from "./utils";
 
-const QUESTION_BANK_HEADERS = ["No", "Question", "Answer", "Image"];
+const QUESTION_BANK_HEADERS = ["No", "Question", "Answer", "Example"];
 
 /**
  * Paginated response type
@@ -27,57 +27,6 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
-/**
- * Parse image URLs from string (handles both ||| and comma delimiters)
- */
-const parseImageUrls = (imageUrlsString: string): string[] => {
-  if (!imageUrlsString) return [];
-
-  // Try new format first (||| delimiter)
-  if (imageUrlsString.includes("|||")) {
-    return imageUrlsString
-      .split("|||")
-      .map((url: string) => url.trim())
-      .filter(Boolean);
-  }
-
-  // Old format: comma delimiter
-  const commaSplit = imageUrlsString.split(",");
-  if (
-    commaSplit.length === 2 &&
-    commaSplit[0].includes("base64") &&
-    !commaSplit[1].includes("data:")
-  ) {
-    // Single base64 image that was incorrectly split
-    return [commaSplit.join(",")];
-  }
-
-  // Multiple images - reconstruct intelligently
-  const reconstructed: string[] = [];
-  let current = "";
-  for (let i = 0; i < commaSplit.length; i++) {
-    const part = commaSplit[i].trim();
-    if (!part) continue;
-
-    if (
-      part.startsWith("data:") ||
-      part.startsWith("http://") ||
-      part.startsWith("https://")
-    ) {
-      if (current) {
-        reconstructed.push(current);
-      }
-      current = part;
-    } else if (current) {
-      current += "," + part;
-    }
-  }
-  if (current) {
-    reconstructed.push(current);
-  }
-
-  return reconstructed.length > 0 ? reconstructed : commaSplit.filter(Boolean);
-};
 
 /**
  * Extract priority from question text and return clean question with priority
@@ -141,27 +90,26 @@ export const getQuestions = async (
 
     const rows = response?.data?.values || [];
     const allQuestions = rows.map((row: any[], index: number) => {
-      // Reconstruct question, answer, imageUrls from multiple columns
-      // Each group is 4 columns: [Q, A, Images, FirstImage]
+      // Reconstruct question, answer, example from multiple columns
+      // Each group is 4 columns: [Q, A, Example]
       let question = "";
       let answer = "";
-      let imageUrlsString = "";
+      let example = "";
 
       // Process in groups of 4 columns starting from index 1 (after Serial number)
       for (let i = 1; i < row.length; i += 4) {
         if (row[i]) question += row[i];
         if (row[i + 1]) answer += row[i + 1];
-        if (row[i + 2]) imageUrlsString += row[i + 2];
+        if (row[i + 2]) example += row[i + 2];
       }
 
-      const imageUrls = parseImageUrls(imageUrlsString);
       const { question: cleanQuestion, priority } = extractPriority(question);
 
       return {
         id: `q-${index}`,
         question: cleanQuestion,
         answer,
-        imageUrls,
+        example: example || undefined,
         priority,
       };
     });
@@ -212,25 +160,20 @@ const buildQuestionRowData = (
   );
   const questionChunks = splitTextIntoChunks(questionWithPriority);
   const answerChunks = splitTextIntoChunks(questionData.answer || "");
-  const imageUrlsString = questionData.imageUrls?.join("|||") || "";
-  const imageUrlsChunks = splitTextIntoChunks(imageUrlsString);
-  const firstImage = questionData.imageUrls?.[0] || "";
-  const firstImageChunks = splitTextIntoChunks(firstImage);
+  const exampleChunks = splitTextIntoChunks(questionData.example || "");
 
   const rowData: any[] = [serialNumber];
 
   const maxChunks = Math.max(
     questionChunks.length,
     answerChunks.length,
-    imageUrlsChunks.length,
-    firstImageChunks.length,
+    exampleChunks.length,
   );
 
   for (let i = 0; i < maxChunks; i++) {
     rowData.push(questionChunks[i] || "");
     rowData.push(answerChunks[i] || "");
-    rowData.push(imageUrlsChunks[i] || "");
-    rowData.push(firstImageChunks[i] || "");
+    rowData.push(exampleChunks[i] || "");
   }
 
   return rowData;

@@ -12,14 +12,14 @@ export interface Question {
   id: string;
   question: string;
   answer: string;
-  imageUrls?: string[];
+  example?: string;
   priority?: "low" | "medium" | "high";
 }
 
 export interface QuestionInput {
   question: string;
   answer: string;
-  imageUrls?: string[];
+  example?: string;
   priority?: "low" | "medium" | "high";
 }
 
@@ -28,7 +28,8 @@ export interface PracticalTask {
   no: string;
   question: string;
   answer: string;
-  image?: string;
+  example?: string;
+  priority?: "low" | "medium" | "high";
 }
 
 export interface Project {

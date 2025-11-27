@@ -6,7 +6,7 @@ import { SPREADSHEET_IDS } from "../../config/googleConfig";
 import type { Technology } from "../../types/googleSheets";
 import { getSheetsClient, ensureSheetHeaders } from "./utils";
 
-const QUESTION_BANK_HEADERS = ["No", "Question", "Answer", "Image"];
+const QUESTION_BANK_HEADERS = ["No", "Question", "Answer", "Example"];
 
 /**
  * Get all technologies

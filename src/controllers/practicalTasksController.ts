@@ -74,7 +74,7 @@ export const addPracticalTaskHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { technologyName } = req.params;
-    const { question, answer, image } = req.body;
+    const { question, answer, example, priority } = req.body;
 
     if (!question || !answer) {
       return sendValidationError(res, "Question and answer are required");
@@ -83,7 +83,8 @@ export const addPracticalTaskHandler = asyncHandler(
     const success = await addPracticalTask(technologyName, {
       question,
       answer,
-      image,
+      example,
+      priority: priority || "low",
     });
 
     if (success) {
@@ -101,7 +102,7 @@ export const updatePracticalTaskHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { technologyName, rowIndex } = req.params;
-    const { question, answer, image } = req.body;
+    const { question, answer, example, priority } = req.body;
 
     if (!question || !answer) {
       return sendValidationError(res, "Question and answer are required");
@@ -110,7 +111,7 @@ export const updatePracticalTaskHandler = asyncHandler(
     const success = await updatePracticalTask(
       technologyName,
       parseInt(rowIndex),
-      { question, answer, image },
+      { question, answer, example, priority: priority || "low" },
     );
 
     if (success) {
