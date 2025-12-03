@@ -25,7 +25,11 @@ const ensureTagsSheet = async (
       return;
     }
 
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(
+      accessToken,
+      null,
+      SPREADSHEET_IDS.TAGS,
+    );
     const sheets = await getSpreadsheetMetadata(
       SPREADSHEET_IDS.TAGS,
       accessToken,
@@ -96,7 +100,11 @@ export const getTags = async (
 ): Promise<Tag[]> => {
   try {
     await ensureTagsSheet(accessToken);
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(
+      accessToken,
+      null,
+      SPREADSHEET_IDS.TAGS,
+    );
 
     if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
       return [];
@@ -135,7 +143,11 @@ export const addTag = async (
     }
 
     await ensureTagsSheet(accessToken);
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(
+      accessToken,
+      null,
+      SPREADSHEET_IDS.TAGS,
+    );
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.TAGS,
@@ -169,7 +181,11 @@ export const updateTag = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(
+      accessToken,
+      null,
+      SPREADSHEET_IDS.TAGS,
+    );
 
     if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
       return false;
@@ -199,7 +215,11 @@ export const deleteTag = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(
+      accessToken,
+      null,
+      SPREADSHEET_IDS.TAGS,
+    );
 
     if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
       return false;

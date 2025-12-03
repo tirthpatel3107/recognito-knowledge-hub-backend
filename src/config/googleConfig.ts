@@ -15,6 +15,7 @@ export interface GoogleConfig {
   CLIENT_SECRET: string;
   REDIRECT_URI: string;
   SCOPES: string[];
+  SERVICE_ACCOUNT_KEY: string; // JSON string of service account credentials
 }
 
 export interface SpreadsheetIds {
@@ -25,6 +26,7 @@ export interface SpreadsheetIds {
   PROJECT_LISTING: string;
   KANBAN_BOARD: string;
   TAGS: string;
+  NOTES: string;
 }
 
 export interface DocIds {
@@ -45,6 +47,7 @@ export const GOOGLE_CONFIG: GoogleConfig = {
   CLIENT_ID: "",
   CLIENT_SECRET: "",
   REDIRECT_URI: "",
+  SERVICE_ACCOUNT_KEY: "",
   SCOPES: [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/documents",
@@ -60,6 +63,7 @@ export const SPREADSHEET_IDS: SpreadsheetIds = {
   PROJECT_LISTING: "",
   KANBAN_BOARD: "",
   TAGS: "",
+  NOTES: "",
 };
 
 export const DOC_IDS: DocIds = {
@@ -99,6 +103,8 @@ export const applySheetConfig = (
     normalizedConfig.GOOGLE_CLIENT_SECRET ?? GOOGLE_CONFIG.CLIENT_SECRET;
   GOOGLE_CONFIG.REDIRECT_URI =
     normalizedConfig.GOOGLE_REDIRECT_URI ?? GOOGLE_CONFIG.REDIRECT_URI;
+  GOOGLE_CONFIG.SERVICE_ACCOUNT_KEY =
+    normalizedConfig.SERVICE_ACCOUNT_KEY ?? GOOGLE_CONFIG.SERVICE_ACCOUNT_KEY;
 
   SPREADSHEET_IDS.QUESTION_BANK =
     normalizedConfig.QUESTION_BANK_SPREADSHEET_ID ??
@@ -122,6 +128,8 @@ export const applySheetConfig = (
     tagsSpreadsheetId && tagsSpreadsheetId.trim() !== ""
       ? tagsSpreadsheetId
       : SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.TAGS;
+  SPREADSHEET_IDS.NOTES =
+    normalizedConfig.NOTES_SPREADSHEET_ID ?? SPREADSHEET_IDS.NOTES;
 
   DOC_IDS.CREDENTIAL = normalizedConfig.CREDENTIAL_DOC_ID ?? DOC_IDS.CREDENTIAL;
   DOC_IDS.WORK_SUMMARY =

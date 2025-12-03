@@ -30,7 +30,11 @@ export const getProjects = async (
   accessToken: string | null = null,
 ): Promise<Project[]> => {
   try {
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(
+      accessToken,
+      null,
+      SPREADSHEET_IDS.WORK_SUMMARY,
+    );
     const sheetName = await getProjectListSheetName(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
@@ -56,7 +60,11 @@ export const addProject = async (
   projectData: ProjectInput,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(
+      null,
+      null,
+      SPREADSHEET_IDS.WORK_SUMMARY,
+    );
     const sheetName = await getProjectListSheetName();
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
@@ -86,7 +94,11 @@ export const updateProject = async (
   projectData: ProjectInput,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(
+      null,
+      null,
+      SPREADSHEET_IDS.WORK_SUMMARY,
+    );
     const sheetName = await getProjectListSheetName();
     const actualRow = rowIndex + 2;
 
@@ -112,7 +124,11 @@ export const deleteProject = async (
   sheetId: number,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(
+      null,
+      null,
+      SPREADSHEET_IDS.WORK_SUMMARY,
+    );
     const actualRow = rowIndex + 2;
 
     await sheetsClient.spreadsheets.batchUpdate({
@@ -147,7 +163,11 @@ export const reorderProjects = async (
   sheetId: number,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(
+      null,
+      null,
+      SPREADSHEET_IDS.WORK_SUMMARY,
+    );
     const actualOldRow = oldIndex + 2;
     const actualNewRow = newIndex + 2;
 

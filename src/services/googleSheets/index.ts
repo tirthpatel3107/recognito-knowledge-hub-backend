@@ -6,6 +6,8 @@
 // Core utilities and initialization
 export {
   initializeGoogleSheets,
+  initializeServiceAccount,
+  isServiceAccountInitialized,
   setUserCredentials,
   getSheetsClient,
   splitTextIntoChunks,
@@ -23,7 +25,12 @@ export {
 } from "./utils";
 
 // Authentication
-export { authenticateUser, updateUserPhotoFromGoogle } from "./auth";
+export {
+  authenticateUser,
+  emailExistsInLoginSheet,
+  normalizeGmailAddress,
+  updateUserPhotoFromGoogle,
+} from "./auth";
 
 // Technologies
 export {
@@ -74,6 +81,25 @@ export {
 
 // Tags
 export { getTags, addTag, updateTag, deleteTag } from "./tags";
+
+// Kanban Board
+export {
+  getKanbanTasks,
+  saveKanbanTasks,
+  type KanbanTask,
+  type KanbanTaskInput,
+} from "./kanban";
+
+// Notes
+export {
+  getTabsFromSheet,
+  getAllNotesFromSheet,
+  getNotesByTab,
+  getNotesByColumn,
+  getTabHeadings,
+  type NotesTab,
+  type Note,
+} from "./notes";
 
 // Work Summary
 export {

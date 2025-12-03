@@ -6,6 +6,8 @@ import { Request, Response } from "express";
 import jwt, { SignOptions } from "jsonwebtoken";
 import {
   authenticateUser,
+  emailExistsInLoginSheet,
+  normalizeGmailAddress,
   updateUserPhotoFromGoogle,
   setUserCredentials,
   initializeGoogleSheets,
@@ -61,10 +63,86 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     );
   }
 
-  const isValid = await authenticateUser(email, password, googleAccessToken);
+  // Step 1: Verify email/password against login sheet
+  const authResult = await authenticateUser(email, password, googleAccessToken);
 
-  if (!isValid) {
+  if (!authResult.success) {
+    // Return specific error message if available
+    if (authResult.error) {
+      return sendError(res, authResult.error, 401);
+    }
     return sendError(res, "Invalid credentials", 401);
+  }
+
+  // Step 2: Verify Google SSO email matches the login email and exists in login sheet
+  let googleEmail: string;
+  try {
+    const userInfoResponse = await fetch(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${googleAccessToken}`,
+        },
+      },
+    );
+
+    if (!userInfoResponse.ok) {
+      return sendError(res, "Invalid Google access token", 401);
+    }
+
+    const userInfo = (await userInfoResponse.json()) as {
+      email?: string;
+    };
+    googleEmail = userInfo.email || "";
+
+    if (!googleEmail) {
+      return sendError(
+        res,
+        "Unable to retrieve email from Google account",
+        401,
+      );
+    }
+
+    // Verify Google SSO email matches the login email (normalize Gmail addresses)
+    const normalizedGoogleEmail = normalizeGmailAddress(googleEmail);
+    const normalizedLoginEmail = normalizeGmailAddress(email);
+
+    if (normalizedGoogleEmail !== normalizedLoginEmail) {
+      return sendError(
+        res,
+        "Google account email does not match login email",
+        403,
+        {
+          loginEmail: email,
+          googleEmail: googleEmail,
+        },
+      );
+    }
+
+    // Verify Google SSO email exists in the login sheet (additional security check)
+    const emailCheckResult = await emailExistsInLoginSheet(
+      googleEmail,
+      googleAccessToken,
+    );
+
+    if (!emailCheckResult.exists) {
+      // Return specific error message if available (e.g., permission denied)
+      if (emailCheckResult.error) {
+        return sendError(res, emailCheckResult.error, 403, {
+          email: googleEmail,
+        });
+      }
+      return sendError(
+        res,
+        "Google account email is not authorized. Please contact administrator.",
+        403,
+        {
+          email: googleEmail,
+        },
+      );
+    }
+  } catch (error) {
+    return sendError(res, "Failed to verify Google account", 401);
   }
 
   await loadConfigFromSheet(googleAccessToken);
@@ -149,15 +227,17 @@ export const verifyGoogleToken = asyncHandler(
       googleEmail = userInfo.email || "";
       googlePhoto = userInfo.picture || "";
 
-      // Verify email matches if expected
-      if (
-        expectedEmail &&
-        googleEmail.toLowerCase() !== expectedEmail.toLowerCase()
-      ) {
-        return sendError(res, "Email mismatch", 403, {
-          expected: expectedEmail,
-          received: googleEmail,
-        });
+      // Verify email matches if expected (normalize Gmail addresses)
+      if (expectedEmail) {
+        const normalizedGoogleEmail = normalizeGmailAddress(googleEmail);
+        const normalizedExpectedEmail = normalizeGmailAddress(expectedEmail);
+
+        if (normalizedGoogleEmail !== normalizedExpectedEmail) {
+          return sendError(res, "Email mismatch", 403, {
+            expected: expectedEmail,
+            received: googleEmail,
+          });
+        }
       }
     } catch {
       // Error verifying Google token

@@ -6,7 +6,9 @@ import {
   applySheetConfig,
   isConfigLoaded,
   SPREADSHEET_IDS,
+  GOOGLE_CONFIG,
 } from "./googleConfig";
+import { initializeServiceAccount } from "../services/googleSheets/utils";
 
 const CONFIG_RANGE = encodeURIComponent("Config!A:B");
 
@@ -86,6 +88,16 @@ export const loadConfigFromSheet = async (
   applySheetConfig(configMap);
   cachedConfig = { ...configMap };
   lastLoadedAt = new Date();
+
+  // Initialize service account if configured
+  if (GOOGLE_CONFIG.SERVICE_ACCOUNT_KEY) {
+    try {
+      initializeServiceAccount(GOOGLE_CONFIG.SERVICE_ACCOUNT_KEY);
+    } catch (error) {
+      // Log error but don't fail config loading
+      console.error("Failed to initialize service account:", error);
+    }
+  }
 
   return cachedConfig;
 };

@@ -3,15 +3,22 @@
  * Shared utilities used across all Google Sheets service modules
  */
 import { google } from "googleapis";
-import { GOOGLE_CONFIG } from "../../config/googleConfig";
+import { GOOGLE_CONFIG, SPREADSHEET_IDS } from "../../config/googleConfig";
 import type { OAuth2Client } from "google-auth-library";
+import type { JWT } from "google-auth-library";
 
 // Global OAuth2 client instance
 let oauth2Client: OAuth2Client | null = null;
 let currentAccessToken: string | null = null;
 
+// Service account client for accessing all sheets (except login sheet)
+let serviceAccountClient: JWT | null = null;
+
 // Cache for sheets clients per access token
 const sheetsClientCache = new Map<string | null, any>();
+
+// Service account client cache
+let serviceAccountSheetsClient: any = null;
 
 /**
  * Initialize Google Sheets service
@@ -28,6 +35,41 @@ export const initializeGoogleSheets = (): void => {
   );
   // Clear cache on re-initialization
   sheetsClientCache.clear();
+};
+
+/**
+ * Initialize service account for accessing all sheets
+ * Service account credentials should be in JSON format (from config sheet or env)
+ */
+export const initializeServiceAccount = (serviceAccountKey: string): void => {
+  try {
+    const key = typeof serviceAccountKey === "string"
+      ? JSON.parse(serviceAccountKey)
+      : serviceAccountKey;
+
+    serviceAccountClient = new google.auth.JWT({
+      email: key.client_email,
+      key: key.private_key,
+      scopes: [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/documents",
+      ],
+    });
+
+    // Clear service account client cache
+    serviceAccountSheetsClient = null;
+  } catch (error) {
+    throw new Error(
+      "Failed to initialize service account. Invalid service account key format.",
+    );
+  }
+};
+
+/**
+ * Check if service account is initialized
+ */
+export const isServiceAccountInitialized = (): boolean => {
+  return serviceAccountClient !== null;
 };
 
 /**
@@ -50,28 +92,77 @@ export const getCurrentAccessToken = (): string | null => {
 };
 
 /**
- * Get Google Sheets client (cached per access token)
+ * Get Google Sheets client
+ * For login sheet: uses user's OAuth token (they need access to login sheet)
+ * For all other sheets: uses service account (which has access to all sheets)
+ * 
+ * @param accessToken - User's OAuth token (required for login sheet operations)
+ * @param useServiceAccount - Force use of service account (default: auto-detect based on spreadsheet)
+ * @param spreadsheetId - Optional spreadsheet ID to determine which auth to use
  */
-export const getSheetsClient = (accessToken: string | null = null): any => {
+export const getSheetsClient = (
+  accessToken: string | null = null,
+  useServiceAccount: boolean | null = null,
+  spreadsheetId?: string,
+): any => {
+  // Determine if we should use service account
+  // Use service account for all sheets except login sheet
+  const loginSpreadsheetId =
+    SPREADSHEET_IDS.LOGIN || process.env.LOGIN_SPREADSHEET_ID || "";
+  const shouldUseServiceAccount =
+    useServiceAccount !== null
+      ? useServiceAccount
+      : spreadsheetId
+        ? spreadsheetId !== loginSpreadsheetId
+        : true; // Default to service account if no spreadsheet ID provided
+
+  if (shouldUseServiceAccount) {
+    // Use service account for all non-login sheets
+    if (!serviceAccountClient) {
+      throw new Error(
+        "Service account is not initialized. Please configure SERVICE_ACCOUNT_KEY in your config sheet.",
+      );
+    }
+
+    // Return cached service account client if available
+    if (serviceAccountSheetsClient) {
+      return serviceAccountSheetsClient;
+    }
+
+    // Create client with service account
+    serviceAccountSheetsClient = google.sheets({
+      version: "v4",
+      auth: serviceAccountClient,
+    });
+
+    return serviceAccountSheetsClient;
+  }
+
+  // Use user's OAuth token for login sheet operations
   const token = accessToken || currentAccessToken;
-  const cacheKey = token || "api_key";
+
+  if (!token) {
+    throw new Error(
+      "OAuth access token is required for login sheet operations.",
+    );
+  }
+
+  if (!oauth2Client) {
+    throw new Error(
+      "Google OAuth client is not initialized. Please ensure OAuth credentials are configured.",
+    );
+  }
+
+  const cacheKey = token;
 
   // Return cached client if available
   if (sheetsClientCache.has(cacheKey)) {
     return sheetsClientCache.get(cacheKey);
   }
 
-  let client: any;
-
-  if (token && oauth2Client) {
-    oauth2Client.setCredentials({ access_token: token });
-    client = google.sheets({ version: "v4", auth: oauth2Client });
-  } else {
-    if (!GOOGLE_CONFIG.API_KEY) {
-      throw new Error("Google API key is not configured for read-only access");
-    }
-    client = google.sheets({ version: "v4", auth: GOOGLE_CONFIG.API_KEY });
-  }
+  // Create client with OAuth token
+  oauth2Client.setCredentials({ access_token: token });
+  const client = google.sheets({ version: "v4", auth: oauth2Client });
 
   // Cache the client
   sheetsClientCache.set(cacheKey, client);
@@ -292,7 +383,7 @@ export const ensureSheetHeaders = async (
   }
 
   try {
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const headerResponse = await sheetsClient.spreadsheets.values.get({
       spreadsheetId,
       range,
@@ -304,7 +395,8 @@ export const ensureSheetHeaders = async (
       headers.every((header, index) => headerRow[index] === header);
 
     if (!headersMatch) {
-      await sheetsClient.spreadsheets.values.update({
+      const updateClient = getSheetsClient(accessToken, null, spreadsheetId);
+      await updateClient.spreadsheets.values.update({
         spreadsheetId,
         range,
         valueInputOption: "RAW",
@@ -323,7 +415,7 @@ export const ensureSheetHeaders = async (
         error.message.includes("does not exist"))
     ) {
       try {
-        const sheetsClient = getSheetsClient(accessToken);
+        const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
         await sheetsClient.spreadsheets.values.update({
           spreadsheetId,
           range,
@@ -353,7 +445,7 @@ export const updateSerialNumbers = async (
 ): Promise<void> => {
   if (rowCount === 0) return;
 
-  const sheetsClient = getSheetsClient(accessToken);
+  const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
   // Google Sheets API batchUpdate has a limit of 100 requests per batch
   const BATCH_SIZE = 100;
@@ -417,7 +509,7 @@ export const getSpreadsheetMetadata = async (
     return cached.sheets;
   }
 
-  const sheetsClient = getSheetsClient(accessToken);
+  const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
   const response = await sheetsClient.spreadsheets.get({
     spreadsheetId,
   });
@@ -517,7 +609,7 @@ export const upsertRowByEmail = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId,
       range: `${sheetName}!A:Z`,

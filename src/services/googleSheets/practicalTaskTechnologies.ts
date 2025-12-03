@@ -23,7 +23,11 @@ export const getPracticalTaskTechnologies = async (
     );
   }
 
-  const sheetsClient = getSheetsClient(accessToken);
+  const sheetsClient = getSheetsClient(
+    accessToken,
+    null,
+    SPREADSHEET_IDS.PRACTICAL_TASKS,
+  );
   const response = await sheetsClient.spreadsheets.get({
     spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
   });
@@ -43,7 +47,11 @@ export const createPracticalTaskTechnology = async (
   name: string,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(
+      null,
+      null,
+      SPREADSHEET_IDS.PRACTICAL_TASKS,
+    );
     const response = await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
       requestBody: {
@@ -86,7 +94,11 @@ export const updatePracticalTaskTechnology = async (
   sheetId: number,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(
+      null,
+      null,
+      SPREADSHEET_IDS.PRACTICAL_TASKS,
+    );
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
       requestBody: {
@@ -116,7 +128,11 @@ export const deletePracticalTaskTechnology = async (
   sheetId: number,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(
+      null,
+      null,
+      SPREADSHEET_IDS.PRACTICAL_TASKS,
+    );
 
     // First, check how many sheets exist
     const spreadsheet = await sheetsClient.spreadsheets.get({
@@ -171,7 +187,11 @@ export const reorderPracticalTaskTechnologies = async (
   technologyIds: number[],
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(
+      null,
+      null,
+      SPREADSHEET_IDS.PRACTICAL_TASKS,
+    );
     const requests = technologyIds.map((sheetId, index) => ({
       updateSheetProperties: {
         properties: {
