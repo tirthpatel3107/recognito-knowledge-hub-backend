@@ -126,7 +126,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // Health check endpoint
-app.get("/health", (req: Request, res: Response) => {
+app.get("/healthh", (req: Request, res: Response) => {
   res.json({ status: "OK", message: "Server is running" });
 });
 
