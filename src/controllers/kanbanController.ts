@@ -36,8 +36,8 @@ export const saveTasks = asyncHandler(
   async (req: Request, res: Response) => {
     const { tasks } = req.body;
 
-    if (!Array.isArray(tasks)) {
-      return sendValidationError(res, "Tasks must be an array");
+    if (!tasks || typeof tasks !== "object" || Array.isArray(tasks)) {
+      return sendValidationError(res, "Tasks must be an object with column keys");
     }
 
     try {
