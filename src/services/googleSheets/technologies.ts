@@ -2,9 +2,9 @@
  * Google Sheets Technologies Service
  * Handles technology (sheet) CRUD operations for Question Bank
  */
-import { SPREADSHEET_IDS } from "../../config/googleConfig";
 import type { Technology } from "../../types/googleSheets";
 import { getSheetsClient, ensureSheetHeaders } from "./utils";
+import { getUserQuestionBankSpreadsheetId } from "./userProfile";
 
 const QUESTION_BANK_HEADERS = ["No", "Question", "Answer", "Example"];
 
@@ -13,19 +13,13 @@ const QUESTION_BANK_HEADERS = ["No", "Question", "Answer", "Example"];
  */
 export const getTechnologies = async (
   accessToken: string | null = null,
+  email: string | null = null,
 ): Promise<Technology[]> => {
-  if (
-    !SPREADSHEET_IDS.QUESTION_BANK ||
-    SPREADSHEET_IDS.QUESTION_BANK.trim() === ""
-  ) {
-    throw new Error(
-      "QUESTION_BANK_SPREADSHEET_ID is not configured. Please authenticate to load configuration.",
-    );
-  }
+  const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
 
-  const sheetsClient = getSheetsClient(accessToken);
+  const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
   const response = await sheetsClient.spreadsheets.get({
-    spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+    spreadsheetId,
   });
 
   const sheets = response?.data?.sheets || [];
@@ -39,11 +33,16 @@ export const getTechnologies = async (
 /**
  * Create a new technology (sheet)
  */
-export const createTechnology = async (name: string): Promise<boolean> => {
+export const createTechnology = async (
+  name: string,
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const response = await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -62,10 +61,11 @@ export const createTechnology = async (name: string): Promise<boolean> => {
       response.data.replies?.[0]?.addSheet?.properties?.sheetId;
     if (newSheetId !== undefined) {
       await ensureSheetHeaders(
-        SPREADSHEET_IDS.QUESTION_BANK,
+        spreadsheetId,
         name,
         QUESTION_BANK_HEADERS,
         `${name}!A1:D1`,
+        accessToken,
       );
     }
 
@@ -82,11 +82,14 @@ export const updateTechnology = async (
   oldName: string,
   newName: string,
   sheetId: number,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -112,13 +115,16 @@ export const updateTechnology = async (
  */
 export const deleteTechnology = async (
   sheetId: number,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     // First, check how many sheets exist
     const spreadsheet = await sheetsClient.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
     });
 
     const sheets = spreadsheet.data.sheets || [];
@@ -134,7 +140,7 @@ export const deleteTechnology = async (
 
     // Proceed with deletion
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -167,9 +173,12 @@ export const deleteTechnology = async (
  */
 export const reorderTechnologies = async (
   technologyIds: number[],
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const requests = technologyIds.map((sheetId, index) => ({
       updateSheetProperties: {
         properties: {
@@ -181,7 +190,7 @@ export const reorderTechnologies = async (
     }));
 
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       requestBody: { requests },
     });
     return true;

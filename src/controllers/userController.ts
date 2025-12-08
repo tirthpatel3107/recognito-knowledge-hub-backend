@@ -6,8 +6,6 @@ import { Request, Response } from "express";
 import {
   getDashboardCardOrder,
   saveDashboardCardOrder,
-  getUserMode,
-  updateUserMode,
   getUserProfile,
   updateUserProfile,
   updateUserPassword,
@@ -16,6 +14,7 @@ import {
   updateUserColorPalette,
   getTabs,
   saveTabs,
+  getUserSpreadsheetIds,
 } from "../services/googleSheets";
 import { getGoogleToken } from "../services/googleTokenStore";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -62,52 +61,6 @@ export const saveDashboardCardOrderHandler = asyncHandler(
   },
 );
 
-/**
- * Get user mode preference
- */
-export const getUserModeHandler = asyncHandler(
-  async (req: Request, res: Response) => {
-    const email = req.user!.email;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const mode = await getUserMode(email, googleToken);
-    return sendSuccess(res, { mode: mode || "Light" });
-  },
-);
-
-/**
- * Update user mode preference
- */
-export const updateUserModeHandler = asyncHandler(
-  async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
-    const email = req.user!.email;
-    let { mode } = req.body;
-
-    // Updating user mode
-
-    // Normalize mode to handle case-insensitive input
-    if (mode && typeof mode === "string") {
-      mode = mode.charAt(0).toUpperCase() + mode.slice(1).toLowerCase();
-    }
-
-    if (!mode || !["Light", "Dark"].includes(mode)) {
-      return sendValidationError(res, "Mode must be Light or Dark", {
-        received: mode,
-      });
-    }
-
-    const success = await updateUserMode(email, mode);
-
-    if (success) {
-      return sendSuccess(res, null, "User mode updated successfully");
-    } else {
-      // updateUserMode returned false
-      return sendError(res, "Failed to update user mode", 500, {
-        details: "updateUserMode function returned false",
-      });
-    }
-  },
-);
 
 /**
  * Get user profile
@@ -231,18 +184,8 @@ export const updateUserColorPaletteHandler = asyncHandler(
     const email = req.user!.email;
     const { lightModeColor, darkModeColor } = req.body;
 
-    // Validate colors are strings (HSL format: "hue saturation% lightness%")
+    // Validate color is a string (HSL format: "hue saturation% lightness%")
     // Allow null/empty to reset to default
-    if (
-      lightModeColor !== undefined &&
-      lightModeColor !== null &&
-      typeof lightModeColor !== "string"
-    ) {
-      return sendValidationError(
-        res,
-        "lightModeColor must be a string or null",
-      );
-    }
     if (
       darkModeColor !== undefined &&
       darkModeColor !== null &&
@@ -252,12 +195,6 @@ export const updateUserColorPaletteHandler = asyncHandler(
     }
 
     // Convert empty strings to null, but preserve null values
-    const lightColorValue =
-      lightModeColor === null ||
-      lightModeColor === undefined ||
-      lightModeColor === ""
-        ? null
-        : lightModeColor;
     const darkColorValue =
       darkModeColor === null ||
       darkModeColor === undefined ||
@@ -267,7 +204,7 @@ export const updateUserColorPaletteHandler = asyncHandler(
 
     const success = await updateUserColorPalette(
       email,
-      lightColorValue,
+      null, // lightModeColor is no longer used
       darkColorValue,
       req.googleToken!,
     );
@@ -327,5 +264,17 @@ export const saveTabsHandler = asyncHandler(
     } else {
       return sendError(res, "Failed to save tabs", 500);
     }
+  },
+);
+
+/**
+ * Get user-specific spreadsheet IDs
+ */
+export const getUserSpreadsheetIdsHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const email = req.user!.email;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const spreadsheetIds = await getUserSpreadsheetIds(email, googleToken);
+    return sendSuccess(res, spreadsheetIds);
   },
 );

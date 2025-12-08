@@ -10,6 +10,14 @@ import {
   upsertRowByEmail,
 } from "./utils";
 
+export interface UserSpreadsheetIds {
+  questionBank?: string;
+  practicalTasks?: string;
+  workSummary?: string;
+  kanbanBoard?: string;
+  notes?: string;
+}
+
 /**
  * Get login spreadsheet ID with fallback to environment variable
  */
@@ -236,45 +244,19 @@ export const updateUserPassword = async (
 };
 
 /**
- * Get user mode
+ * Sync Card IDs from DashboardOrder to UserDetail Card IDs column
  */
-export const getUserMode = async (
+export const syncCardIdsToUserDetail = async (
   email: string,
+  cardIds: string[],
   accessToken: string | null = null,
-): Promise<string | null> => {
+): Promise<boolean> => {
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: "UserDetail!A2:E100",
-    });
-
-    const rows = response?.data?.values || [];
-    for (const row of rows) {
-      if (row[0]?.toLowerCase() === email.toLowerCase()) {
-        return row[4] || "Light";
-      }
-    }
-    return "Light";
-  } catch (error) {
-    return "Light";
-  }
-};
-
-/**
- * Update user mode
- */
-export const updateUserMode = async (
-  email: string,
-  mode: string,
-): Promise<boolean> => {
-  try {
-    const loginSpreadsheetId = getLoginSpreadsheetId();
-    const sheetsClient = getSheetsClient();
-    const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: loginSpreadsheetId,
-      range: "UserDetail!A2:E100",
+      range: "UserDetail!A2:F100",
     });
 
     const rows = response?.data?.values || [];
@@ -284,18 +266,163 @@ export const updateUserMode = async (
       return false;
     }
 
+    // Join card IDs with newlines for single field storage (as shown in example)
+    const cardIdsString = cardIds.join("\n");
+
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: loginSpreadsheetId,
-      range: `UserDetail!E${rowIndex}`,
+      range: `UserDetail!F${rowIndex}`,
       valueInputOption: "RAW",
       requestBody: {
-        values: [[mode]],
+        values: [[cardIdsString]],
       },
     });
     return true;
   } catch (error) {
+    console.error("Error syncing Card IDs to UserDetail:", error);
     return false;
   }
+};
+
+/**
+ * Get user-specific spreadsheet IDs from UserDetail
+ * Columns: H=QUESTION_BANK, I=PRACTICAL_TASKS, J=WORK_SUMMARY, K=KANBAN_BOARD, L=NOTES
+ */
+export const getUserSpreadsheetIds = async (
+  email: string,
+  accessToken: string | null = null,
+): Promise<UserSpreadsheetIds> => {
+  try {
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    const sheetsClient = getSheetsClient(accessToken);
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: loginSpreadsheetId,
+      range: "UserDetail!A2:L100",
+    });
+
+    const rows = response?.data?.values || [];
+    console.log(`[getUserSpreadsheetIds] Searching for email: ${email}`);
+    console.log(`[getUserSpreadsheetIds] Found ${rows.length} rows in UserDetail`);
+    
+    for (const row of rows) {
+      if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
+        console.log(`[getUserSpreadsheetIds] Found matching row for ${email}`);
+        console.log(`[getUserSpreadsheetIds] Row length: ${row.length}`);
+        console.log(`[getUserSpreadsheetIds] Row data:`, {
+          email: row[0],
+          colH_index7: row[7] || "(empty)",
+          colI_index8: row[8] || "(empty)",
+          colJ_index9: row[9] || "(empty)",
+          colK_index10: row[10] || "(empty)",
+          colL_index11: row[11] || "(empty)",
+        });
+        
+        const result = {
+          questionBank: row[7] && row[7].trim() !== "" ? row[7].trim() : undefined,
+          practicalTasks: row[8] && row[8].trim() !== "" ? row[8].trim() : undefined,
+          workSummary: row[9] && row[9].trim() !== "" ? row[9].trim() : undefined,
+          kanbanBoard: row[10] && row[10].trim() !== "" ? row[10].trim() : undefined,
+          notes: row[11] && row[11].trim() !== "" ? row[11].trim() : undefined,
+        };
+        
+        console.log(`[getUserSpreadsheetIds] Extracted spreadsheet IDs:`, result);
+        return result;
+      }
+    }
+    
+    console.log(`[getUserSpreadsheetIds] No matching row found for ${email}`);
+    return {};
+  } catch (error) {
+    console.error(`[getUserSpreadsheetIds] Error getting user spreadsheet IDs for ${email}:`, error);
+    if (error instanceof Error) {
+      console.error(`[getUserSpreadsheetIds] Error message:`, error.message);
+      console.error(`[getUserSpreadsheetIds] Error stack:`, error.stack);
+    }
+    return {};
+  }
+};
+
+/**
+ * Helper functions to get specific spreadsheet IDs with fallback to config
+ */
+export const getUserQuestionBankSpreadsheetId = async (
+  email: string | null,
+  accessToken: string | null = null,
+): Promise<string> => {
+  if (email) {
+    const userSheetIds = await getUserSpreadsheetIds(email, accessToken);
+    if (userSheetIds.questionBank) {
+      return userSheetIds.questionBank;
+    }
+  }
+  if (!SPREADSHEET_IDS.QUESTION_BANK || SPREADSHEET_IDS.QUESTION_BANK.trim() === "") {
+    throw new Error("QUESTION_BANK_SPREADSHEET_ID is not configured");
+  }
+  return SPREADSHEET_IDS.QUESTION_BANK;
+};
+
+export const getUserPracticalTasksSpreadsheetId = async (
+  email: string | null,
+  accessToken: string | null = null,
+): Promise<string> => {
+  if (email) {
+    const userSheetIds = await getUserSpreadsheetIds(email, accessToken);
+    if (userSheetIds.practicalTasks) {
+      return userSheetIds.practicalTasks;
+    }
+  }
+  if (!SPREADSHEET_IDS.PRACTICAL_TASKS || SPREADSHEET_IDS.PRACTICAL_TASKS.trim() === "") {
+    throw new Error("PRACTICAL_TASKS_SPREADSHEET_ID is not configured");
+  }
+  return SPREADSHEET_IDS.PRACTICAL_TASKS;
+};
+
+export const getUserWorkSummarySpreadsheetId = async (
+  email: string | null,
+  accessToken: string | null = null,
+): Promise<string> => {
+  if (email) {
+    const userSheetIds = await getUserSpreadsheetIds(email, accessToken);
+    if (userSheetIds.workSummary) {
+      return userSheetIds.workSummary;
+    }
+  }
+  if (!SPREADSHEET_IDS.WORK_SUMMARY || SPREADSHEET_IDS.WORK_SUMMARY.trim() === "") {
+    throw new Error("WORK_SUMMARY_SPREADSHEET_ID is not configured");
+  }
+  return SPREADSHEET_IDS.WORK_SUMMARY;
+};
+
+export const getUserKanbanBoardSpreadsheetId = async (
+  email: string | null,
+  accessToken: string | null = null,
+): Promise<string> => {
+  if (email) {
+    const userSheetIds = await getUserSpreadsheetIds(email, accessToken);
+    if (userSheetIds.kanbanBoard) {
+      return userSheetIds.kanbanBoard;
+    }
+  }
+  if (!SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.KANBAN_BOARD.trim() === "") {
+    throw new Error("KANBAN_BOARD_SPREADSHEET_ID is not configured");
+  }
+  return SPREADSHEET_IDS.KANBAN_BOARD;
+};
+
+export const getUserNotesSpreadsheetId = async (
+  email: string | null,
+  accessToken: string | null = null,
+): Promise<string> => {
+  if (email) {
+    const userSheetIds = await getUserSpreadsheetIds(email, accessToken);
+    if (userSheetIds.notes) {
+      return userSheetIds.notes;
+    }
+  }
+  if (!SPREADSHEET_IDS.NOTES || SPREADSHEET_IDS.NOTES.trim() === "") {
+    throw new Error("NOTES_SPREADSHEET_ID is not configured");
+  }
+  return SPREADSHEET_IDS.NOTES;
 };
 
 /**
@@ -310,16 +437,16 @@ export const getUserColorPalette = async (
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: "UserDetail!A2:G100",
+      range: "UserDetail!A2:L100",
     });
 
     const rows = response?.data?.values || [];
     for (const row of rows) {
       if (row[0]?.toLowerCase() === email.toLowerCase()) {
-        const lightColor = row[5] && row[5].trim() !== "" ? row[5] : null;
+        // DarkModeColor is now in column G (index 6)
         const darkColor = row[6] && row[6].trim() !== "" ? row[6] : null;
         return {
-          lightModeColor: lightColor,
+          lightModeColor: null,
           darkModeColor: darkColor,
         };
       }
@@ -350,7 +477,7 @@ export const updateUserColorPalette = async (
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
-      range: "UserDetail!A2:G100",
+      range: "UserDetail!A2:L100",
     });
 
     const rows = response?.data?.values || [];
@@ -360,15 +487,15 @@ export const updateUserColorPalette = async (
       return false;
     }
 
-    const lightColorValue = lightModeColor === null ? "" : lightModeColor || "";
+    // Only update darkModeColor (column G, index 6)
     const darkColorValue = darkModeColor === null ? "" : darkModeColor || "";
 
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: loginSpreadsheetId,
-      range: `UserDetail!F${rowIndex}:G${rowIndex}`,
+      range: `UserDetail!G${rowIndex}`,
       valueInputOption: "RAW",
       requestBody: {
-        values: [[lightColorValue, darkColorValue]],
+        values: [[darkColorValue]],
       },
     });
 

@@ -45,11 +45,13 @@ export const getQuestionsByTechnology = asyncHandler(
       return sendValidationError(res, "Limit must be a positive integer");
     }
 
+    const email = req.user?.email || null;
     const questions = await getQuestions(
       technologyName,
       googleToken,
       page,
       limit,
+      email,
     );
     return sendSuccess(res, questions);
   },
@@ -61,6 +63,7 @@ export const getQuestionsByTechnology = asyncHandler(
 export const addQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
+    const email = req.user?.email || null;
     const { technologyName } = req.params;
     const { question, answer, example, priority } = req.body;
 
@@ -73,7 +76,7 @@ export const addQuestionHandler = asyncHandler(
       answer,
       example,
       priority: priority || "low",
-    });
+    }, email, req.googleToken!);
 
     if (success) {
       return sendSuccess(res, null, "Question added successfully");
@@ -89,6 +92,7 @@ export const addQuestionHandler = asyncHandler(
 export const updateQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
+    const email = req.user?.email || null;
     const { technologyName, rowIndex } = req.params;
     const { question, answer, example, priority } = req.body;
 
@@ -101,7 +105,7 @@ export const updateQuestionHandler = asyncHandler(
       answer,
       example,
       priority: priority || "low",
-    });
+    }, email, req.googleToken!);
 
     if (success) {
       return sendSuccess(res, null, "Question updated successfully");
@@ -127,11 +131,13 @@ export const deleteQuestionHandler = asyncHandler(
       return sendNotFound(res, "Technology");
     }
 
+    const email = req.user?.email || null;
     const success = await deleteQuestion(
       technologyName,
       parseInt(rowIndex),
       tech.sheetId,
       req.googleToken!,
+      email,
     );
 
     if (success) {
@@ -175,11 +181,14 @@ export const reorderQuestionsHandler = asyncHandler(
       return sendNotFound(res, "Technology");
     }
 
+    const email = req.user?.email || null;
     const success = await reorderQuestions(
       technologyName,
       oldIndex,
       newIndex,
       tech.sheetId,
+      email,
+      req.googleToken!,
     );
 
     if (success) {

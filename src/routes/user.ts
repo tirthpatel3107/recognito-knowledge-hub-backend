@@ -22,16 +22,6 @@ router.post(
   userController.saveDashboardCardOrderHandler,
 );
 
-// Get user mode preference
-router.get("/mode", authenticateToken, userController.getUserModeHandler);
-
-// Update user mode preference
-router.post(
-  "/mode",
-  authenticateToken,
-  authenticateGoogleToken,
-  userController.updateUserModeHandler,
-);
 
 // Get user profile (username and email from UserDetail sheet)
 router.get("/profile", authenticateToken, userController.getUserProfileHandler);
@@ -76,6 +66,13 @@ router.post(
   authenticateToken,
   authenticateGoogleToken,
   userController.saveTabsHandler,
+);
+
+// Get user-specific spreadsheet IDs
+router.get(
+  "/spreadsheet-ids",
+  authenticateToken,
+  userController.getUserSpreadsheetIdsHandler,
 );
 
 export default router;

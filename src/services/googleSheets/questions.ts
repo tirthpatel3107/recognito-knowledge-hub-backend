@@ -2,7 +2,6 @@
  * Google Sheets Questions Service
  * Handles question CRUD operations with support for chunked text
  */
-import { SPREADSHEET_IDS } from "../../config/googleConfig";
 import type { Question, QuestionInput } from "../../types/googleSheets";
 import {
   getSheetsClient,
@@ -13,6 +12,7 @@ import {
   getSpreadsheetMetadata,
   clearSpreadsheetMetadataCache,
 } from "./utils";
+import { getUserQuestionBankSpreadsheetId } from "./userProfile";
 
 const QUESTION_BANK_HEADERS = ["No", "Question", "Answer", "Example"];
 
@@ -58,10 +58,11 @@ const appendPriority = (questionText: string, priority: "low" | "medium" | "high
  */
 const ensureQuestionBankHeaders = async (
   technologyName: string,
+  spreadsheetId: string,
   accessToken: string | null = null,
 ): Promise<void> => {
   await ensureSheetHeaders(
-    SPREADSHEET_IDS.QUESTION_BANK,
+    spreadsheetId,
     technologyName,
     QUESTION_BANK_HEADERS,
     `${technologyName}!A1:D1`,
@@ -78,13 +79,15 @@ export const getQuestions = async (
   accessToken: string | null = null,
   page?: number,
   limit?: number,
+  email: string | null = null,
 ): Promise<Question[] | PaginatedResponse<Question>> => {
-  await ensureQuestionBankHeaders(technologyName, accessToken);
+  const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+  await ensureQuestionBankHeaders(technologyName, spreadsheetId, accessToken);
 
   try {
-    const sheetsClient = getSheetsClient(accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       range: `${technologyName}!A2:Z1000`,
     });
 
@@ -185,13 +188,16 @@ const buildQuestionRowData = (
 export const addQuestion = async (
   technologyName: string,
   questionData: QuestionInput,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    await ensureQuestionBankHeaders(technologyName);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    await ensureQuestionBankHeaders(technologyName, spreadsheetId, accessToken);
 
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       range: `${technologyName}!A:A`,
     });
     const rowCount = (response?.data?.values?.length || 1) + 1;
@@ -201,7 +207,7 @@ export const addQuestion = async (
     const range = `${technologyName}!A${rowCount}:${endColumn}${rowCount}`;
 
     await sheetsClient.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       range,
       valueInputOption: "RAW",
       requestBody: {
@@ -221,14 +227,17 @@ export const updateQuestion = async (
   technologyName: string,
   rowIndex: number,
   questionData: QuestionInput,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const actualRow = rowIndex + 2;
 
     // Read current row to see how many columns are used
     const currentRowResponse = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       range: `${technologyName}!A${actualRow}:ZZ${actualRow}`,
     });
     const currentRow = currentRowResponse.data.values?.[0] || [];
@@ -247,7 +256,7 @@ export const updateQuestion = async (
     }
 
     await sheetsClient.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       range,
       valueInputOption: "RAW",
       requestBody: {
@@ -268,14 +277,16 @@ export const deleteQuestion = async (
   rowIndex: number,
   sheetId: number,
   accessToken: string | null = null,
+  email: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient(accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const actualRow = rowIndex + 2;
 
     // Delete the row
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -293,15 +304,17 @@ export const deleteQuestion = async (
     });
 
     // Update serial numbers
-    const updatedQuestions = await getQuestions(technologyName, accessToken);
+    const updatedQuestions = await getQuestions(technologyName, accessToken, undefined, undefined, email);
     const questionsArray = Array.isArray(updatedQuestions)
       ? updatedQuestions
       : updatedQuestions.data;
 
     await updateSerialNumbers(
-      SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       technologyName,
       questionsArray.length,
+      2,
+      accessToken,
     );
 
     return true;
@@ -318,19 +331,22 @@ export const reorderQuestions = async (
   oldIndex: number,
   newIndex: number,
   sheetId: number,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     if (oldIndex === newIndex) {
       return true;
     }
 
-    const sheetsClient = getSheetsClient();
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const oldRowNumber = oldIndex + 1;
     const newRowNumber = newIndex + 1;
 
     // Move the row
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -350,15 +366,17 @@ export const reorderQuestions = async (
     });
 
     // Update serial numbers
-    const updatedQuestions = await getQuestions(technologyName);
+    const updatedQuestions = await getQuestions(technologyName, accessToken, undefined, undefined, email);
     const questionsArray = Array.isArray(updatedQuestions)
       ? updatedQuestions
       : updatedQuestions.data;
 
     await updateSerialNumbers(
-      SPREADSHEET_IDS.QUESTION_BANK,
+      spreadsheetId,
       technologyName,
       questionsArray.length,
+      2,
+      accessToken,
     );
 
     return true;

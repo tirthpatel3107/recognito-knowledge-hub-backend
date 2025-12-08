@@ -643,6 +643,14 @@ export const upsertRowByEmail = async (
 
     return true;
   } catch (error) {
+    console.error(
+      `[upsertRowByEmail] Error upserting row for email ${email} in sheet ${sheetName}:`,
+      error,
+    );
+    if (error instanceof Error) {
+      console.error(`[upsertRowByEmail] Error message: ${error.message}`);
+      console.error(`[upsertRowByEmail] Error stack: ${error.stack}`);
+    }
     return false;
   }
 };

@@ -116,12 +116,18 @@ export {
   getUserProfile,
   updateUserProfile,
   updateUserPassword,
-  getUserMode,
-  updateUserMode,
   getUserColorPalette,
   updateUserColorPalette,
   getTabs,
   saveTabs,
+  syncCardIdsToUserDetail,
+  getUserSpreadsheetIds,
+  getUserQuestionBankSpreadsheetId,
+  getUserPracticalTasksSpreadsheetId,
+  getUserWorkSummarySpreadsheetId,
+  getUserKanbanBoardSpreadsheetId,
+  getUserNotesSpreadsheetId,
+  type UserSpreadsheetIds,
 } from "./userProfile";
 
 // Dashboard

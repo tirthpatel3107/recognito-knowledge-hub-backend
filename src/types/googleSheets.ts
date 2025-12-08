@@ -66,7 +66,7 @@ export interface UserProfile {
 }
 
 export interface ColorPalette {
-  lightModeColor: string | null;
+  lightModeColor: string | null; // Deprecated - kept for backward compatibility, always null
   darkModeColor: string | null;
 }
 

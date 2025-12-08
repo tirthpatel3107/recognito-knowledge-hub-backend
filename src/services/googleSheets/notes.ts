@@ -12,13 +12,14 @@ import {
 
 const TABS_SHEET_NAME = "Tabs";
 const ALL_NOTES_SHEET_NAME = "All Notes";
-const TABS_HEADERS = ["ID", "Tab Name"];
-const ALL_NOTES_HEADERS = ["ID", "Title", "Description1", "Description2", "Description3"];
+const TABS_HEADERS = ["ID", "Tab Name", "Pinned"];
+const ALL_NOTES_HEADERS = ["ID", "Title", "Description1", "Description2", "Description3", "Starred"];
 
 export interface NotesTab {
   id: string;
   name: string;
   sheetId?: number;
+  pinned?: boolean;
 }
 
 export interface Note {
@@ -34,6 +35,7 @@ export interface Note {
   description?: string;
   description2?: string;
   description3?: string;
+  starred?: boolean;
 }
 
 /**
@@ -49,7 +51,7 @@ const ensureTabsSheet = async (): Promise<void> => {
       SPREADSHEET_IDS.NOTES,
       TABS_SHEET_NAME,
       TABS_HEADERS,
-      `${TABS_SHEET_NAME}!A1:B1`,
+      `${TABS_SHEET_NAME}!A1:C1`,
       null,
     );
   } catch (error) {
@@ -71,7 +73,7 @@ const ensureAllNotesSheet = async (): Promise<void> => {
       SPREADSHEET_IDS.NOTES,
       ALL_NOTES_SHEET_NAME,
       ALL_NOTES_HEADERS,
-      `${ALL_NOTES_SHEET_NAME}!A1:E1`,
+      `${ALL_NOTES_SHEET_NAME}!A1:F1`,
       null,
     );
   } catch (error) {
@@ -99,7 +101,7 @@ export const getTabsFromSheet = async (): Promise<NotesTab[]> => {
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.NOTES,
-      range: `${TABS_SHEET_NAME}!A2:B1000`,
+      range: `${TABS_SHEET_NAME}!A2:C1000`,
     });
 
     const rows = response?.data?.values || [];
@@ -112,6 +114,7 @@ export const getTabsFromSheet = async (): Promise<NotesTab[]> => {
       if (row.length >= 2) {
         const tabId = row[0]?.toString().trim() || "";
         const tabName = row[1]?.toString().trim() || "";
+        const pinned = row[2]?.toString().trim().toLowerCase() === "true" || row[2]?.toString().trim() === "1";
 
         if (tabId && tabName) {
           // Find sheetId for this tab
@@ -123,6 +126,7 @@ export const getTabsFromSheet = async (): Promise<NotesTab[]> => {
             id: tabId,
             name: tabName,
             sheetId: sheet?.properties?.sheetId,
+            pinned: pinned,
           });
         }
       }
@@ -153,7 +157,7 @@ export const getAllNotesFromSheet = async (): Promise<Note[]> => {
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_IDS.NOTES,
-      range: `${ALL_NOTES_SHEET_NAME}!A1:E1000`,
+      range: `${ALL_NOTES_SHEET_NAME}!A1:F1000`,
     });
 
     const rows = response?.data?.values || [];
@@ -170,6 +174,7 @@ export const getAllNotesFromSheet = async (): Promise<Note[]> => {
       const description = row[2]?.toString().trim() || "";
       const description2 = row[3]?.toString().trim() || "";
       const description3 = row[4]?.toString().trim() || "";
+      const starred = row[5]?.toString().trim().toLowerCase() === "true" || row[5]?.toString().trim() === "1";
 
       if (id && title) {
         notes.push({
@@ -179,6 +184,7 @@ export const getAllNotesFromSheet = async (): Promise<Note[]> => {
           description: description,
           description2: description2,
           description3: description3,
+          starred: starred,
           columnIndex: 0,
           columnLetter: "A",
           heading: title,
