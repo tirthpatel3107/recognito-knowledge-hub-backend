@@ -2,7 +2,7 @@
  * Notes Routes
  */
 import express from "express";
-import { authenticateToken } from "../middleware/auth";
+import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
 import * as notesController from "../controllers/notesController";
 
 const router = express.Router();
@@ -28,6 +28,14 @@ router.get(
   "/tab/:tabName/headings",
   authenticateToken,
   notesController.getHeadings,
+);
+
+// Update a note in "All Notes" sheet
+router.put(
+  "/all/:rowIndex",
+  authenticateToken,
+  authenticateGoogleToken,
+  notesController.updateNote,
 );
 
 export default router;

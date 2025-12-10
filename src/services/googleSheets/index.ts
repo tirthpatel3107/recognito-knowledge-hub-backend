@@ -118,15 +118,13 @@ export {
   updateUserPassword,
   getUserColorPalette,
   updateUserColorPalette,
-  getTabs,
-  saveTabs,
-  syncCardIdsToUserDetail,
   getUserSpreadsheetIds,
   getUserQuestionBankSpreadsheetId,
   getUserPracticalTasksSpreadsheetId,
   getUserWorkSummarySpreadsheetId,
   getUserKanbanBoardSpreadsheetId,
   getUserNotesSpreadsheetId,
+  getUserTagsSpreadsheetId,
   type UserSpreadsheetIds,
 } from "./userProfile";
 

@@ -2,7 +2,6 @@
  * Google Sheets Tags Service
  * Handles tag CRUD operations
  */
-import { SPREADSHEET_IDS } from "../../config/googleConfig";
 import type { Tag, TagInput } from "../../types/googleSheets";
 import {
   getSheetsClient,
@@ -11,6 +10,7 @@ import {
   getSpreadsheetMetadata,
   clearSpreadsheetMetadataCache,
 } from "./utils";
+import { getUserTagsSpreadsheetId } from "./userProfile";
 
 const TAGS_HEADERS = ["No", "Name"];
 
@@ -18,20 +18,21 @@ const TAGS_HEADERS = ["No", "Name"];
  * Ensure Tags sheet exists and has correct headers
  */
 const ensureTagsSheet = async (
+  spreadsheetId: string,
   accessToken: string | null = null,
 ): Promise<void> => {
   try {
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
+    if (!spreadsheetId || spreadsheetId.trim() === "") {
       return;
     }
 
     const sheetsClient = getSheetsClient(
       accessToken,
       null,
-      SPREADSHEET_IDS.TAGS,
+      spreadsheetId,
     );
     const sheets = await getSpreadsheetMetadata(
-      SPREADSHEET_IDS.TAGS,
+      spreadsheetId,
       accessToken,
     );
     const tagsSheet = sheets.find(
@@ -41,7 +42,7 @@ const ensureTagsSheet = async (
     if (!tagsSheet) {
       // Create Tags sheet
       await sheetsClient.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_IDS.TAGS,
+        spreadsheetId: spreadsheetId,
         requestBody: {
           requests: [
             {
@@ -58,7 +59,7 @@ const ensureTagsSheet = async (
 
     // Ensure headers exist
     await ensureSheetHeaders(
-      SPREADSHEET_IDS.TAGS,
+      spreadsheetId,
       "Tags",
       TAGS_HEADERS,
       "Tags!A1:B1",
@@ -67,7 +68,7 @@ const ensureTagsSheet = async (
 
     // Ensure default "Daily" tag exists
     const tagsResponse = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      spreadsheetId: spreadsheetId,
       range: "Tags!A2:B1000",
     });
 
@@ -79,7 +80,7 @@ const ensureTagsSheet = async (
     if (!dailyTagExists) {
       const rowCount = rows.length + 2;
       await sheetsClient.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_IDS.TAGS,
+        spreadsheetId: spreadsheetId,
         range: `Tags!A${rowCount}`,
         valueInputOption: "RAW",
         requestBody: {
@@ -96,22 +97,26 @@ const ensureTagsSheet = async (
  * Get all tags
  */
 export const getTags = async (
+  email: string | null = null,
   accessToken: string | null = null,
 ): Promise<Tag[]> => {
   try {
-    await ensureTagsSheet(accessToken);
+    // Get user-specific spreadsheet ID (tags are in the same spreadsheet as kanban board)
+    const spreadsheetId = await getUserTagsSpreadsheetId(email, accessToken);
+
+    await ensureTagsSheet(spreadsheetId, accessToken);
     const sheetsClient = getSheetsClient(
       accessToken,
       null,
-      SPREADSHEET_IDS.TAGS,
+      spreadsheetId,
     );
 
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
+    if (!spreadsheetId || spreadsheetId.trim() === "") {
       return [];
     }
 
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      spreadsheetId: spreadsheetId,
       range: "Tags!A2:B1000",
     });
 
@@ -131,32 +136,36 @@ export const getTags = async (
  */
 export const addTag = async (
   tagData: TagInput,
+  email: string | null = null,
   accessToken: string | null = null,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
-      return { success: false, error: "TAGS spreadsheet ID is not configured" };
-    }
-
     if (!accessToken) {
       return { success: false, error: "Google access token is required" };
     }
 
-    await ensureTagsSheet(accessToken);
+    // Get user-specific spreadsheet ID (tags are in the same spreadsheet as kanban board)
+    const spreadsheetId = await getUserTagsSpreadsheetId(email, accessToken);
+
+    if (!spreadsheetId || spreadsheetId.trim() === "") {
+      return { success: false, error: "TAGS spreadsheet ID is not configured" };
+    }
+
+    await ensureTagsSheet(spreadsheetId, accessToken);
     const sheetsClient = getSheetsClient(
       accessToken,
       null,
-      SPREADSHEET_IDS.TAGS,
+      spreadsheetId,
     );
 
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      spreadsheetId: spreadsheetId,
       range: "Tags!A:A",
     });
     const rowCount = (response?.data?.values?.length || 1) + 1;
 
     await sheetsClient.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      spreadsheetId: spreadsheetId,
       range: `Tags!A${rowCount}`,
       valueInputOption: "RAW",
       requestBody: {
@@ -178,23 +187,27 @@ export const addTag = async (
 export const updateTag = async (
   rowIndex: number,
   tagData: TagInput,
+  email: string | null = null,
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
+    // Get user-specific spreadsheet ID (tags are in the same spreadsheet as kanban board)
+    const spreadsheetId = await getUserTagsSpreadsheetId(email, accessToken);
+
+    if (!spreadsheetId || spreadsheetId.trim() === "") {
+      return false;
+    }
+
     const sheetsClient = getSheetsClient(
       accessToken,
       null,
-      SPREADSHEET_IDS.TAGS,
+      spreadsheetId,
     );
-
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
-      return false;
-    }
 
     const actualRow = rowIndex + 2;
 
     await sheetsClient.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      spreadsheetId: spreadsheetId,
       range: `Tags!A${actualRow}:B${actualRow}`,
       valueInputOption: "RAW",
       requestBody: {
@@ -212,22 +225,26 @@ export const updateTag = async (
  */
 export const deleteTag = async (
   rowIndex: number,
+  email: string | null = null,
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      SPREADSHEET_IDS.TAGS,
-    );
+    // Get user-specific spreadsheet ID (tags are in the same spreadsheet as kanban board)
+    const spreadsheetId = await getUserTagsSpreadsheetId(email, accessToken);
 
-    if (!SPREADSHEET_IDS.TAGS || SPREADSHEET_IDS.TAGS.trim() === "") {
+    if (!spreadsheetId || spreadsheetId.trim() === "") {
       return false;
     }
 
+    const sheetsClient = getSheetsClient(
+      accessToken,
+      null,
+      spreadsheetId,
+    );
+
     // Get the sheet ID for Tags (using cached metadata)
     const sheets = await getSpreadsheetMetadata(
-      SPREADSHEET_IDS.TAGS,
+      spreadsheetId,
       accessToken,
     );
     const tagsSheet = sheets.find(
@@ -242,7 +259,7 @@ export const deleteTag = async (
     const actualRow = rowIndex + 2;
 
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.TAGS,
+      spreadsheetId: spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -260,14 +277,15 @@ export const deleteTag = async (
     });
 
     // Update serial numbers
-    const updatedTags = await getTags(accessToken);
-    await updateSerialNumbers(SPREADSHEET_IDS.TAGS, "Tags", updatedTags.length);
+    const updatedTags = await getTags(email, accessToken);
+    await updateSerialNumbers(spreadsheetId, "Tags", updatedTags.length);
 
     // Clear cache after modification
-    clearSpreadsheetMetadataCache(SPREADSHEET_IDS.TAGS);
+    clearSpreadsheetMetadataCache(spreadsheetId);
 
     return true;
   } catch (error) {
     return false;
   }
 };
+

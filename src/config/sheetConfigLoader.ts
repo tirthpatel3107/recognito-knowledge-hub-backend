@@ -1,5 +1,5 @@
 /**
- * Loads backend configuration from the secured Google Sheet's Config tab.
+ * Loads backend configuration from the secured Google Sheet's Config or UserDetail tab.
  */
 
 import {
@@ -10,7 +10,10 @@ import {
 } from "./googleConfig";
 import { initializeServiceAccount } from "../services/googleSheets/utils";
 
-const CONFIG_RANGE = encodeURIComponent("Config!A:B");
+// Try Config tab first (standard location), fallback to UserDetail tab
+const CONFIG_SHEET_NAMES = ["Config", "UserDetail"];
+const CONFIG_RANGE_VERTICAL = "!A:B"; // Key-value pairs in columns A and B
+const CONFIG_RANGE_HORIZONTAL = "!A1:Z100"; // Headers in row 1, values in rows below
 
 let cachedConfig: Record<string, string> | null = null;
 let lastLoadedAt: Date | null = null;
@@ -52,37 +55,168 @@ export const loadConfigFromSheet = async (
 
   ensureFetchAvailable();
 
-  const response = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${loginSpreadsheetId}/values/${CONFIG_RANGE}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    },
-  );
+  let configMap: Record<string, string> = {};
+  let lastError: Error | null = null;
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(
-      `Failed to load configuration from sheet (status ${response.status}): ${errorBody}`,
-    );
-  }
+  // Try each sheet name
+  for (const sheetName of CONFIG_SHEET_NAMES) {
+    try {
+      // First try vertical format (A:B - key in column A, value in column B)
+      let response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${loginSpreadsheetId}/values/${encodeURIComponent(sheetName + CONFIG_RANGE_VERTICAL)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
 
-  const payload = (await response.json()) as { values?: string[][] };
-  const rows = payload.values || [];
+      if (response.ok) {
+        const payload = (await response.json()) as { values?: string[][] };
+        const rows = payload.values || [];
 
-  if (rows.length < 2) {
-    throw new Error("Config sheet is empty or missing key/value rows.");
-  }
+        if (rows.length >= 2) {
+          // Parse vertical format (key-value pairs)
+          // Exclude spreadsheet IDs - they should come from UserDetail tab per-user
+          const excludedKeys = [
+            "QUESTION_BANK_SPREADSHEET_ID",
+            "PRACTICAL_TASKS_SPREADSHEET_ID",
+            "WORK_SUMMARY_SPREADSHEET_ID",
+            "KANBAN_BOARD_SPREADSHEET_ID",
+            "NOTES_SPREADSHEET_ID",
+            "PROJECT_LISTING_SPREADSHEET_ID",
+            "TAGS_SPREADSHEET_ID",
+          ];
+          for (let i = 1; i < rows.length; i += 1) {
+            const [rawKey, rawValue] = rows[i];
+            if (!rawKey) {
+              continue;
+            }
+            const normalizedKey = rawKey.trim().toUpperCase();
+            // Skip spreadsheet ID keys
+            if (excludedKeys.some(key => normalizedKey === key || normalizedKey.includes(key))) {
+              continue;
+            }
+            configMap[rawKey.trim()] = (rawValue ?? "").trim();
+          }
 
-  const configMap: Record<string, string> = {};
+          // If we got valid config, break out of the loop
+          if (Object.keys(configMap).length > 0) {
+            break;
+          }
+        }
+      }
 
-  for (let i = 1; i < rows.length; i += 1) {
-    const [rawKey, rawValue] = rows[i];
-    if (!rawKey) {
+      // If vertical format didn't work, try horizontal format (headers in row 1)
+      response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${loginSpreadsheetId}/values/${encodeURIComponent(sheetName + CONFIG_RANGE_HORIZONTAL)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      if (response.ok) {
+        const payload = (await response.json()) as { values?: string[][] };
+        const rows = payload.values || [];
+
+        if (rows.length >= 2) {
+          // Find header row (row 0) - look for spreadsheet ID headers
+          const headers = rows[0] || [];
+          const headerIndices: Record<string, number> = {};
+
+          headers.forEach((header, index) => {
+            if (header && typeof header === "string") {
+              const normalizedHeader = header.trim().toUpperCase();
+              // Map headers to config keys - check exact matches first, then partial matches
+              // NOTE: Spreadsheet IDs are now loaded from UserDetail tab per-user, not from Config tab
+              const configKeyMap: Record<string, string> = {
+                // Spreadsheet IDs excluded - these should come from UserDetail tab per-user
+                // "KANBAN_BOARD_SPREADSHEET_ID": "KANBAN_BOARD_SPREADSHEET_ID",
+                // "QUESTION_BANK_SPREADSHEET_ID": "QUESTION_BANK_SPREADSHEET_ID",
+                // "PRACTICAL_TASKS_SPREADSHEET_ID": "PRACTICAL_TASKS_SPREADSHEET_ID",
+                // "WORK_SUMMARY_SPREADSHEET_ID": "WORK_SUMMARY_SPREADSHEET_ID",
+                // "PROJECT_LISTING_SPREADSHEET_ID": "PROJECT_LISTING_SPREADSHEET_ID",
+                // "NOTES_SPREADSHEET_ID": "NOTES_SPREADSHEET_ID",
+                // "TAGS_SPREADSHEET_ID": "TAGS_SPREADSHEET_ID",
+                "GOOGLE_API_KEY": "GOOGLE_API_KEY",
+                "GOOGLE_CLIENT_ID": "GOOGLE_CLIENT_ID",
+                "CLIENT_ID": "GOOGLE_CLIENT_ID",
+                "GOOGLE_CLIENT_SECRET": "GOOGLE_CLIENT_SECRET",
+                "CLIENT_SECRET": "GOOGLE_CLIENT_SECRET",
+                "SERVICE_ACCOUNT_KEY": "SERVICE_ACCOUNT_KEY",
+                "JWT_SECRET": "JWT_SECRET",
+              };
+
+              // Check for exact match first
+              if (configKeyMap[normalizedHeader]) {
+                headerIndices[configKeyMap[normalizedHeader]] = index;
+              } else {
+                // Fall back to partial matches
+                // NOTE: Spreadsheet IDs are excluded - they come from UserDetail tab per-user
+                // if (normalizedHeader.includes("KANBAN_BOARD") && !headerIndices["KANBAN_BOARD_SPREADSHEET_ID"]) {
+                //   headerIndices["KANBAN_BOARD_SPREADSHEET_ID"] = index;
+                // } else if (normalizedHeader.includes("QUESTION_BANK") && !headerIndices["QUESTION_BANK_SPREADSHEET_ID"]) {
+                //   headerIndices["QUESTION_BANK_SPREADSHEET_ID"] = index;
+                // } else if (normalizedHeader.includes("PRACTICAL_TASKS") && !headerIndices["PRACTICAL_TASKS_SPREADSHEET_ID"]) {
+                //   headerIndices["PRACTICAL_TASKS_SPREADSHEET_ID"] = index;
+                // } else if (normalizedHeader.includes("WORK_SUMMARY") && !headerIndices["WORK_SUMMARY_SPREADSHEET_ID"]) {
+                //   headerIndices["WORK_SUMMARY_SPREADSHEET_ID"] = index;
+                // } else if (normalizedHeader.includes("PROJECT_LISTING") && !headerIndices["PROJECT_LISTING_SPREADSHEET_ID"]) {
+                //   headerIndices["PROJECT_LISTING_SPREADSHEET_ID"] = index;
+                // } else if (normalizedHeader.includes("NOTES") && normalizedHeader.includes("SPREADSHEET") && !headerIndices["NOTES_SPREADSHEET_ID"]) {
+                //   headerIndices["NOTES_SPREADSHEET_ID"] = index;
+                // } else if (normalizedHeader.includes("TAGS") && normalizedHeader.includes("SPREADSHEET") && !headerIndices["TAGS_SPREADSHEET_ID"]) {
+                //   headerIndices["TAGS_SPREADSHEET_ID"] = index;
+                // } else 
+                if (normalizedHeader.includes("GOOGLE_API_KEY") && !headerIndices["GOOGLE_API_KEY"]) {
+                  headerIndices["GOOGLE_API_KEY"] = index;
+                } else if (normalizedHeader.includes("CLIENT_ID") && !normalizedHeader.includes("SECRET") && !headerIndices["GOOGLE_CLIENT_ID"]) {
+                  headerIndices["GOOGLE_CLIENT_ID"] = index;
+                } else if (normalizedHeader.includes("CLIENT_SECRET") && !headerIndices["GOOGLE_CLIENT_SECRET"]) {
+                  headerIndices["GOOGLE_CLIENT_SECRET"] = index;
+                } else if (normalizedHeader.includes("SERVICE_ACCOUNT") && !headerIndices["SERVICE_ACCOUNT_KEY"]) {
+                  headerIndices["SERVICE_ACCOUNT_KEY"] = index;
+                } else if (normalizedHeader.includes("JWT_SECRET") && !headerIndices["JWT_SECRET"]) {
+                  headerIndices["JWT_SECRET"] = index;
+                }
+              }
+            }
+          });
+
+          // Extract values from data rows (rows 1+)
+          // Use the first non-empty value for each config key
+          for (let i = 1; i < rows.length; i += 1) {
+            const row = rows[i] || [];
+            Object.entries(headerIndices).forEach(([key, colIndex]) => {
+              // Only set if not already set (use first non-empty value)
+              if (!configMap[key]) {
+                const value = row[colIndex];
+                if (value && typeof value === "string" && value.trim()) {
+                  configMap[key] = value.trim();
+                }
+              }
+            });
+          }
+
+          // If we got valid config, break out of the loop
+          if (Object.keys(configMap).length > 0) {
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      // Continue to next sheet name
       continue;
     }
-    configMap[rawKey] = rawValue ?? "";
+  }
+
+  if (Object.keys(configMap).length === 0) {
+    throw new Error(
+      `Failed to load configuration from sheet. Tried sheets: ${CONFIG_SHEET_NAMES.join(", ")}. ${lastError ? lastError.message : "No valid configuration found."}`,
+    );
   }
 
   applySheetConfig(configMap);

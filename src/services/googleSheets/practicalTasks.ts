@@ -2,7 +2,6 @@
  * Google Sheets Practical Tasks Service
  * Handles practical task CRUD operations with support for chunked text
  */
-import { SPREADSHEET_IDS } from "../../config/googleConfig";
 import type { PracticalTask } from "../../types/googleSheets";
 import {
   getSheetsClient,
@@ -14,23 +13,63 @@ import {
   clearSpreadsheetMetadataCache,
 } from "./utils";
 import type { PaginatedResponse } from "./questions";
+import { getUserPracticalTasksSpreadsheetId } from "./userProfile";
 
 const PRACTICAL_TASK_HEADERS = ["No", "Question", "Answer", "Example"];
 
 /**
  * Ensure practical task headers exist for a technology sheet
+ * Creates the sheet if it doesn't exist
  */
 const ensurePracticalTaskHeaders = async (
   technologyName: string,
+  spreadsheetId: string,
   accessToken: string | null = null,
 ): Promise<void> => {
+  try {
+    // Check if the sheet exists
+    const sheets = await getSpreadsheetMetadata(
+      spreadsheetId,
+      accessToken,
+    );
+    const sheetExists = sheets.some(
+      (sheet: any) =>
+        sheet.properties?.title?.toLowerCase() === technologyName.toLowerCase(),
+    );
+
+    // If sheet doesn't exist, create it
+    if (!sheetExists) {
+      const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
+      await sheetsClient.spreadsheets.batchUpdate({
+        spreadsheetId: spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: technologyName,
+                },
+              },
+            },
+          ],
+        },
+      });
+      // Clear cache after creating new sheet
+      clearSpreadsheetMetadataCache(spreadsheetId);
+    }
+
+    // Ensure headers exist
     await ensureSheetHeaders(
-    SPREADSHEET_IDS.PRACTICAL_TASKS,
-    technologyName,
-    PRACTICAL_TASK_HEADERS,
-    `${technologyName}!A1:D1`,
-    accessToken,
-  );
+      spreadsheetId,
+      technologyName,
+      PRACTICAL_TASK_HEADERS,
+      `${technologyName}!A1:D1`,
+      accessToken,
+    );
+  } catch (error) {
+    console.error("Error ensuring practical task headers:", error);
+    throw error;
+  }
 };
 
 /**
@@ -38,12 +77,14 @@ const ensurePracticalTaskHeaders = async (
  * Note: This reads from a specific "UserDetail" sheet in the PRACTICAL_TASKS spreadsheet
  */
 export const getPracticalTasks = async (
+  email: string | null = null,
   accessToken: string | null = null,
 ): Promise<PracticalTask[]> => {
   try {
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId: spreadsheetId,
       range: "UserDetail!A2:E1000",
     });
 
@@ -65,14 +106,16 @@ export const getPracticalTasks = async (
  */
 export const getPracticalTasksByTechnology = async (
   technologyName: string,
+  email: string | null = null,
   accessToken: string | null = null,
   page?: number,
   limit?: number,
 ): Promise<PracticalTask[] | PaginatedResponse<PracticalTask>> => {
   try {
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId: spreadsheetId,
       range: `${technologyName}!A2:Z1000`,
     });
 
@@ -188,13 +231,16 @@ const buildPracticalTaskRowData = (
 export const addPracticalTask = async (
   technologyName: string,
   taskData: { question: string; answer: string; example?: string; priority?: "low" | "medium" | "high" },
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    await ensurePracticalTaskHeaders(technologyName);
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
+    await ensurePracticalTaskHeaders(technologyName, spreadsheetId, accessToken);
 
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId: spreadsheetId,
       range: `${technologyName}!A:A`,
     });
     const rowCount = (response?.data?.values?.length || 1) + 1;
@@ -204,7 +250,7 @@ export const addPracticalTask = async (
     const range = `${technologyName}!A${rowCount}:${endColumn}${rowCount}`;
 
     await sheetsClient.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId: spreadsheetId,
       range,
       valueInputOption: "RAW",
       requestBody: {
@@ -213,7 +259,9 @@ export const addPracticalTask = async (
     });
     return true;
   } catch (error) {
-    return false;
+    console.error("Error adding practical task:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to add practical task: ${errorMessage}`);
   }
 };
 
@@ -224,9 +272,12 @@ export const updatePracticalTask = async (
   technologyName: string,
   rowIndex: number,
   taskData: { question: string; answer: string; example?: string; priority?: "low" | "medium" | "high" },
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken);
     const actualRow = rowIndex + 2;
 
     const rowData = buildPracticalTaskRowData(rowIndex + 1, taskData);
@@ -234,7 +285,7 @@ export const updatePracticalTask = async (
     const range = `${technologyName}!A${actualRow}:${endColumn}${actualRow}`;
 
     await sheetsClient.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId: spreadsheetId,
       range,
       valueInputOption: "RAW",
       requestBody: {
@@ -253,15 +304,17 @@ export const updatePracticalTask = async (
 export const deletePracticalTask = async (
   technologyName: string,
   rowIndex: number,
+  email: string | null = null,
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
     const sheetsClient = getSheetsClient(accessToken);
     const actualRow = rowIndex + 2;
 
     // Get the sheet ID for the technology (using cached metadata)
     const sheets = await getSpreadsheetMetadata(
-      SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId,
       accessToken,
     );
     const sheet = sheets.find(
@@ -274,7 +327,7 @@ export const deletePracticalTask = async (
 
     // Delete the row
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId: spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -294,6 +347,7 @@ export const deletePracticalTask = async (
     // Update serial numbers
     const updatedTasks = await getPracticalTasksByTechnology(
       technologyName,
+      email,
       accessToken,
     );
     const tasksArray = Array.isArray(updatedTasks)
@@ -301,13 +355,14 @@ export const deletePracticalTask = async (
       : updatedTasks.data;
 
     await updateSerialNumbers(
-      SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId,
       technologyName,
       tasksArray.length,
+      accessToken,
     );
 
     // Clear cache after modification
-    clearSpreadsheetMetadataCache(SPREADSHEET_IDS.PRACTICAL_TASKS);
+    clearSpreadsheetMetadataCache(spreadsheetId);
 
     return true;
   } catch (error) {
@@ -322,16 +377,20 @@ export const reorderPracticalTasks = async (
   technologyName: string,
   oldIndex: number,
   newIndex: number,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     if (oldIndex === newIndex) {
       return true;
     }
 
-    const sheetsClient = getSheetsClient();
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken);
     // Get the sheet ID for the technology (using cached metadata)
     const sheets = await getSpreadsheetMetadata(
-      SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId,
+      accessToken,
     );
     const sheet = sheets.find(
       (s: any) => s.properties.title === technologyName,
@@ -346,7 +405,7 @@ export const reorderPracticalTasks = async (
 
     // Move the row
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId: spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -366,19 +425,20 @@ export const reorderPracticalTasks = async (
     });
 
     // Update serial numbers
-    const updatedTasks = await getPracticalTasksByTechnology(technologyName);
+    const updatedTasks = await getPracticalTasksByTechnology(technologyName, email, accessToken);
     const tasksArray = Array.isArray(updatedTasks)
       ? updatedTasks
       : updatedTasks.data;
 
     await updateSerialNumbers(
-      SPREADSHEET_IDS.PRACTICAL_TASKS,
+      spreadsheetId,
       technologyName,
       tasksArray.length,
+      accessToken,
     );
 
     // Clear cache after modification
-    clearSpreadsheetMetadataCache(SPREADSHEET_IDS.PRACTICAL_TASKS);
+    clearSpreadsheetMetadataCache(spreadsheetId);
 
     return true;
   } catch (error) {

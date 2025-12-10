@@ -7,8 +7,8 @@ import * as tagsController from "../controllers/tagsController";
 
 const router = express.Router();
 
-// Get all tags (read-only, but supports OAuth if available)
-router.get("/", tagsController.getAllTags);
+// Get all tags (requires auth to get user-specific spreadsheet IDs from UserDetail)
+router.get("/", authenticateToken, tagsController.getAllTags);
 
 // Add tag (requires Google auth)
 router.post(

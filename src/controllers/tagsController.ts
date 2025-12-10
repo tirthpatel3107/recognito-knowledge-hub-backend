@@ -22,8 +22,9 @@ import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
  * Get all tags
  */
 export const getAllTags = asyncHandler(async (req: Request, res: Response) => {
+  const email = req.user?.email || null;
   const googleToken = getGoogleTokenFromRequest(req);
-  const tags = await getTags(googleToken);
+  const tags = await getTags(email, googleToken);
   return sendSuccess(res, tags);
 });
 
@@ -32,6 +33,7 @@ export const getAllTags = asyncHandler(async (req: Request, res: Response) => {
  */
 export const addTagHandler = asyncHandler(
   async (req: Request, res: Response) => {
+    const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
 
     if (!googleToken) {
@@ -45,7 +47,7 @@ export const addTagHandler = asyncHandler(
       return sendValidationError(res, "Tag name is required");
     }
 
-    const result = await addTag({ name: name.trim() }, googleToken);
+    const result = await addTag({ name: name.trim() }, email, googleToken);
 
     if (result.success) {
       return sendSuccess(res, null, "Tag added successfully");
@@ -60,6 +62,7 @@ export const addTagHandler = asyncHandler(
  */
 export const updateTagHandler = asyncHandler(
   async (req: Request, res: Response) => {
+    const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
 
     if (!googleToken) {
@@ -79,6 +82,7 @@ export const updateTagHandler = asyncHandler(
       {
         name: name.trim(),
       },
+      email,
       googleToken,
     );
 
@@ -95,6 +99,7 @@ export const updateTagHandler = asyncHandler(
  */
 export const deleteTagHandler = asyncHandler(
   async (req: Request, res: Response) => {
+    const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
 
     if (!googleToken) {
@@ -104,7 +109,7 @@ export const deleteTagHandler = asyncHandler(
     setUserCredentials(googleToken);
     const { rowIndex } = req.params;
 
-    const success = await deleteTag(parseInt(rowIndex), googleToken);
+    const success = await deleteTag(parseInt(rowIndex), email, googleToken);
 
     if (success) {
       return sendSuccess(res, null, "Tag deleted successfully");

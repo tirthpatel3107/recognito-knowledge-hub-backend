@@ -11,8 +11,8 @@ import {
   reorderProjects,
   setUserCredentials,
   getSheetsClient,
+  findSheetByName,
 } from "../services/googleSheets";
-import { SPREADSHEET_IDS } from "../config/googleConfig";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
@@ -24,75 +24,27 @@ import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 // Helper to get sheet ID for "Project List" sheet
 // Note: Project List sheet (tab) is inside the WORK_SUMMARY spreadsheet, not PROJECT_LISTING
-// This uses the same search logic as the service layer for consistency
+// This uses the findSheetByName utility for consistent sheet matching logic
 const getProjectListSheetId = async (
+  email: string | null,
   accessToken: string | null = null,
 ): Promise<{ sheetId?: number; availableSheets?: string[] }> => {
   try {
-    const sheetsClient = getSheetsClient(accessToken);
-
-    if (!SPREADSHEET_IDS.WORK_SUMMARY) {
-      // WORK_SUMMARY spreadsheet ID is not configured
-      return { availableSheets: [] };
-    }
-
-    const response = await sheetsClient.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
-    });
-
-    const sheetsList = response.data.sheets || [];
-    const availableSheets = sheetsList
-      .map((sheet: any) => sheet.properties?.title)
-      .filter(Boolean);
-
-    // Searching for Project List sheet
-
-    // Try multiple search strategies
-    let projectListSheet = null;
-
-    // Strategy 1: Exact case-sensitive match
-    projectListSheet = sheetsList.find(
-      (sheet: any) => sheet.properties?.title === "Project List",
+    const { getUserWorkSummarySpreadsheetId } = await import("../services/googleSheets/userProfile");
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    
+    const result = await findSheetByName(
+      spreadsheetId,
+      "Project List",
+      accessToken,
     );
 
-    if (projectListSheet) {
-      // Found Project List sheet using exact case-sensitive match
-    } else {
-      // Strategy 2: Case-insensitive match with normalized whitespace
-      projectListSheet = sheetsList.find((sheet: any) => {
-        const title = sheet.properties?.title || "";
-        const normalized = title.replace(/\s+/g, " ").trim().toLowerCase();
-        return normalized === "project list";
-      });
-
-      if (projectListSheet) {
-        // Found Project List sheet using normalized case-insensitive match
-      } else {
-        // Strategy 3: Partial match (contains both words)
-        projectListSheet = sheetsList.find((sheet: any) => {
-          const title = (sheet.properties?.title || "").toLowerCase();
-          return title.includes("project") && title.includes("list");
-        });
-
-        if (projectListSheet) {
-          // Found Project List sheet using partial match
-        }
-      }
+    // Check if sheetId exists (using !== undefined to handle 0 as valid sheetId)
+    if (result.sheetId === undefined || result.sheetId === null) {
+      return { availableSheets: result.availableSheets };
     }
 
-    if (!projectListSheet) {
-      // Project List sheet (tab) not found in WORK_SUMMARY spreadsheet
-      return { availableSheets };
-    }
-
-    const sheetId = projectListSheet.properties?.sheetId;
-    if (!sheetId) {
-      // Project List sheet found but sheetId is missing
-      return { availableSheets };
-    }
-
-    // Successfully found Project List sheet
-    return { sheetId, availableSheets };
+    return { sheetId: result.sheetId, availableSheets: result.availableSheets };
   } catch {
     // Error getting Project List sheet ID
     return { availableSheets: [] };
@@ -104,8 +56,9 @@ const getProjectListSheetId = async (
  */
 export const getAllProjects = asyncHandler(
   async (req: Request, res: Response) => {
+    const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
-    const projects = await getProjects(googleToken);
+    const projects = await getProjects(email, googleToken);
     return sendSuccess(res, projects);
   },
 );
@@ -117,6 +70,8 @@ export const addProjectHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { project, projectId } = req.body;
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
 
     if (!project || !projectId) {
       return sendValidationError(
@@ -125,7 +80,7 @@ export const addProjectHandler = asyncHandler(
       );
     }
 
-    const success = await addProject({ project, projectId });
+    const success = await addProject({ project, projectId }, email, googleToken);
 
     if (success) {
       return sendSuccess(res, null, "Project added successfully");
@@ -142,7 +97,9 @@ export const updateProjectHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { rowIndex } = req.params;
-    const { project, projectId } = req.body;
+    const { project, projectId, oldProjectName } = req.body;
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
 
     if (!project || !projectId) {
       return sendValidationError(
@@ -151,10 +108,16 @@ export const updateProjectHandler = asyncHandler(
       );
     }
 
-    const success = await updateProject(parseInt(rowIndex), {
-      project,
-      projectId,
-    });
+    const success = await updateProject(
+      parseInt(rowIndex),
+      {
+        project,
+        projectId,
+      },
+      email,
+      googleToken,
+      oldProjectName,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Project updated successfully");
@@ -169,24 +132,54 @@ export const updateProjectHandler = asyncHandler(
  */
 export const deleteProjectHandler = asyncHandler(
   async (req: Request, res: Response) => {
+    console.log(`[deleteProjectHandler] DELETE request received`);
+    console.log(`[deleteProjectHandler] req.params:`, req.params);
+    console.log(`[deleteProjectHandler] req.url:`, req.url);
+    console.log(`[deleteProjectHandler] req.path:`, req.path);
+    
     setUserCredentials(req.googleToken!);
     const { rowIndex } = req.params;
+    
+    console.log(`[deleteProjectHandler] rowIndex from params: "${rowIndex}"`);
+    console.log(`[deleteProjectHandler] parsed rowIndex: ${parseInt(rowIndex)}`);
 
-    const result = await getProjectListSheetId(req.googleToken!);
+    if (!rowIndex || isNaN(parseInt(rowIndex))) {
+      console.log(`[deleteProjectHandler] Invalid rowIndex: ${rowIndex}`);
+      return sendValidationError(res, `Invalid rowIndex parameter: ${rowIndex}. Must be a number.`);
+    }
 
-    if (!result.sheetId) {
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    console.log(`[deleteProjectHandler] Getting Project List sheet ID for email: ${email}`);
+    
+    const result = await getProjectListSheetId(email, googleToken);
+    console.log(`[deleteProjectHandler] getProjectListSheetId result:`, {
+      hasSheetId: result.sheetId !== undefined && result.sheetId !== null,
+      sheetId: result.sheetId,
+      sheetIdType: typeof result.sheetId,
+      availableSheets: result.availableSheets,
+    });
+
+    // Check if sheetId exists (using !== undefined to handle 0 as valid sheetId)
+    if (result.sheetId === undefined || result.sheetId === null) {
       const availableSheets = result.availableSheets?.join(", ") || "none";
+      console.log(`[deleteProjectHandler] Project List sheet not found. Available: ${availableSheets}`);
       return sendNotFound(
         res,
         `Project List sheet (tab) not found in Work Summary spreadsheet. Available sheets (tabs): ${availableSheets}. Please ensure the tab is named exactly "Project List".`,
       );
     }
 
-    const success = await deleteProject(parseInt(rowIndex), result.sheetId);
+    const parsedRowIndex = parseInt(rowIndex);
+    console.log(`[deleteProjectHandler] Attempting to delete project at rowIndex: ${parsedRowIndex} (will delete row ${parsedRowIndex + 2} in sheet)`);
+    
+    const success = await deleteProject(parsedRowIndex, result.sheetId, email, googleToken);
 
     if (success) {
+      console.log(`[deleteProjectHandler] Project deleted successfully`);
       return sendSuccess(res, null, "Project deleted successfully");
     } else {
+      console.log(`[deleteProjectHandler] Failed to delete project`);
       return sendError(res, "Failed to delete project", 500);
     }
   },
@@ -212,9 +205,12 @@ export const reorderProjectsHandler = asyncHandler(
       );
     }
 
-    const result = await getProjectListSheetId(req.googleToken!);
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const result = await getProjectListSheetId(email, googleToken);
 
-    if (!result.sheetId) {
+    // Check if sheetId exists (using !== undefined to handle 0 as valid sheetId)
+    if (result.sheetId === undefined || result.sheetId === null) {
       const availableSheets = result.availableSheets?.join(", ") || "none";
       return sendNotFound(
         res,
@@ -222,7 +218,7 @@ export const reorderProjectsHandler = asyncHandler(
       );
     }
 
-    const success = await reorderProjects(oldIndex, newIndex, result.sheetId);
+    const success = await reorderProjects(oldIndex, newIndex, result.sheetId, email, googleToken);
 
     if (success) {
       return sendSuccess(res, null, "Projects reordered successfully");

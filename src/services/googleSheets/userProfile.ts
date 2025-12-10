@@ -32,76 +32,6 @@ const getLoginSpreadsheetId = (): string => {
 };
 
 /**
- * Ensure Tabs sheet exists with headers
- */
-const ensureTabsSheetExists = async (
-  accessToken: string | null = null,
-): Promise<boolean> => {
-  try {
-    const loginSpreadsheetId = getLoginSpreadsheetId();
-    const sheetsClient = getSheetsClient(accessToken);
-
-    try {
-      await sheetsClient.spreadsheets.values.get({
-        spreadsheetId: loginSpreadsheetId,
-        range: "Tabs!A1:C1",
-      });
-      const headerResponse = await sheetsClient.spreadsheets.values.get({
-        spreadsheetId: loginSpreadsheetId,
-        range: "Tabs!A1:C1",
-      });
-      const headers = headerResponse?.data?.values?.[0];
-
-      if (!headers || headers.length === 0) {
-        await sheetsClient.spreadsheets.values.update({
-          spreadsheetId: loginSpreadsheetId,
-          range: "Tabs!A1:C1",
-          valueInputOption: "RAW",
-          requestBody: {
-            values: [["Email", "Tabs", "ActiveTabId"]],
-          },
-        });
-      }
-      return true;
-    } catch (error: any) {
-      if (
-        error.code === 400 ||
-        error.message?.includes("Unable to parse range")
-      ) {
-        await sheetsClient.spreadsheets.batchUpdate({
-          spreadsheetId: loginSpreadsheetId,
-          requestBody: {
-            requests: [
-              {
-                addSheet: {
-                  properties: {
-                    title: "Tabs",
-                  },
-                },
-              },
-            ],
-          },
-        });
-
-        await sheetsClient.spreadsheets.values.update({
-          spreadsheetId: loginSpreadsheetId,
-          range: "Tabs!A1:C1",
-          valueInputOption: "RAW",
-          requestBody: {
-            values: [["Email", "Tabs", "ActiveTabId"]],
-          },
-        });
-        return true;
-      }
-      throw error;
-    }
-  } catch (error) {
-    console.error("Error ensuring Tabs sheet exists:", error);
-    return false;
-  }
-};
-
-/**
  * Get user profile
  */
 export const getUserProfile = async (
@@ -243,46 +173,6 @@ export const updateUserPassword = async (
   }
 };
 
-/**
- * Sync Card IDs from DashboardOrder to UserDetail Card IDs column
- */
-export const syncCardIdsToUserDetail = async (
-  email: string,
-  cardIds: string[],
-  accessToken: string | null = null,
-): Promise<boolean> => {
-  try {
-    const loginSpreadsheetId = getLoginSpreadsheetId();
-    const sheetsClient = getSheetsClient(accessToken);
-    const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: loginSpreadsheetId,
-      range: "UserDetail!A2:F100",
-    });
-
-    const rows = response?.data?.values || [];
-    const rowIndex = findRowIndexByEmail(rows, email);
-
-    if (rowIndex === -1) {
-      return false;
-    }
-
-    // Join card IDs with newlines for single field storage (as shown in example)
-    const cardIdsString = cardIds.join("\n");
-
-    await sheetsClient.spreadsheets.values.update({
-      spreadsheetId: loginSpreadsheetId,
-      range: `UserDetail!F${rowIndex}`,
-      valueInputOption: "RAW",
-      requestBody: {
-        values: [[cardIdsString]],
-      },
-    });
-    return true;
-  } catch (error) {
-    console.error("Error syncing Card IDs to UserDetail:", error);
-    return false;
-  }
-};
 
 /**
  * Get user-specific spreadsheet IDs from UserDetail
@@ -343,7 +233,8 @@ export const getUserSpreadsheetIds = async (
 };
 
 /**
- * Helper functions to get specific spreadsheet IDs with fallback to config
+ * Helper functions to get specific spreadsheet IDs from UserDetail tab
+ * Spreadsheet IDs should be configured per-user in the UserDetail tab (columns H, I, J, K, L)
  */
 export const getUserQuestionBankSpreadsheetId = async (
   email: string | null,
@@ -355,10 +246,12 @@ export const getUserQuestionBankSpreadsheetId = async (
       return userSheetIds.questionBank;
     }
   }
-  if (!SPREADSHEET_IDS.QUESTION_BANK || SPREADSHEET_IDS.QUESTION_BANK.trim() === "") {
-    throw new Error("QUESTION_BANK_SPREADSHEET_ID is not configured");
+  // Fallback to environment variable only (no longer from Config tab)
+  const envSpreadsheetId = process.env.QUESTION_BANK_SPREADSHEET_ID;
+  if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
+    return envSpreadsheetId;
   }
-  return SPREADSHEET_IDS.QUESTION_BANK;
+  throw new Error("QUESTION_BANK_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column H) for your user.");
 };
 
 export const getUserPracticalTasksSpreadsheetId = async (
@@ -371,10 +264,12 @@ export const getUserPracticalTasksSpreadsheetId = async (
       return userSheetIds.practicalTasks;
     }
   }
-  if (!SPREADSHEET_IDS.PRACTICAL_TASKS || SPREADSHEET_IDS.PRACTICAL_TASKS.trim() === "") {
-    throw new Error("PRACTICAL_TASKS_SPREADSHEET_ID is not configured");
+  // Fallback to environment variable only (no longer from Config tab)
+  const envSpreadsheetId = process.env.PRACTICAL_TASKS_SPREADSHEET_ID;
+  if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
+    return envSpreadsheetId;
   }
-  return SPREADSHEET_IDS.PRACTICAL_TASKS;
+  throw new Error("PRACTICAL_TASKS_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column I) for your user.");
 };
 
 export const getUserWorkSummarySpreadsheetId = async (
@@ -387,10 +282,12 @@ export const getUserWorkSummarySpreadsheetId = async (
       return userSheetIds.workSummary;
     }
   }
-  if (!SPREADSHEET_IDS.WORK_SUMMARY || SPREADSHEET_IDS.WORK_SUMMARY.trim() === "") {
-    throw new Error("WORK_SUMMARY_SPREADSHEET_ID is not configured");
+  // Fallback to environment variable only (no longer from Config tab)
+  const envSpreadsheetId = process.env.WORK_SUMMARY_SPREADSHEET_ID;
+  if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
+    return envSpreadsheetId;
   }
-  return SPREADSHEET_IDS.WORK_SUMMARY;
+  throw new Error("WORK_SUMMARY_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column J) for your user.");
 };
 
 export const getUserKanbanBoardSpreadsheetId = async (
@@ -403,10 +300,12 @@ export const getUserKanbanBoardSpreadsheetId = async (
       return userSheetIds.kanbanBoard;
     }
   }
-  if (!SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.KANBAN_BOARD.trim() === "") {
-    throw new Error("KANBAN_BOARD_SPREADSHEET_ID is not configured");
+  // Fallback to environment variable only (no longer from Config tab)
+  const envSpreadsheetId = process.env.KANBAN_BOARD_SPREADSHEET_ID;
+  if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
+    return envSpreadsheetId;
   }
-  return SPREADSHEET_IDS.KANBAN_BOARD;
+  throw new Error("KANBAN_BOARD_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column K) for your user.");
 };
 
 export const getUserNotesSpreadsheetId = async (
@@ -419,10 +318,25 @@ export const getUserNotesSpreadsheetId = async (
       return userSheetIds.notes;
     }
   }
-  if (!SPREADSHEET_IDS.NOTES || SPREADSHEET_IDS.NOTES.trim() === "") {
-    throw new Error("NOTES_SPREADSHEET_ID is not configured");
+  // Fallback to environment variable only (no longer from Config tab)
+  const envSpreadsheetId = process.env.NOTES_SPREADSHEET_ID;
+  if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
+    return envSpreadsheetId;
   }
-  return SPREADSHEET_IDS.NOTES;
+  throw new Error("NOTES_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column L) for your user.");
+};
+
+/**
+ * Get tags spreadsheet ID
+ * Tags default to the same spreadsheet as the kanban board (in a "Tags" sheet)
+ */
+export const getUserTagsSpreadsheetId = async (
+  email: string | null,
+  accessToken: string | null = null,
+): Promise<string> => {
+  // Tags are stored in the same spreadsheet as the kanban board
+  // So we use the kanban board spreadsheet ID
+  return getUserKanbanBoardSpreadsheetId(email, accessToken);
 };
 
 /**
@@ -505,75 +419,3 @@ export const updateUserColorPalette = async (
   }
 };
 
-/**
- * Get user tabs
- */
-export const getTabs = async (
-  email: string,
-  accessToken: string | null = null,
-): Promise<{ tabs: any[]; activeTabId: string | null } | null> => {
-  try {
-    await ensureTabsSheetExists(accessToken);
-
-    const loginSpreadsheetId = getLoginSpreadsheetId();
-    const sheetsClient = getSheetsClient(accessToken);
-    const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: loginSpreadsheetId,
-      range: "Tabs!A:C",
-    });
-
-    const rows = response?.data?.values || [];
-
-    for (const row of rows) {
-      if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
-        try {
-          const tabsJson = row[1] || "[]";
-          const tabs = JSON.parse(tabsJson);
-          const activeTabId = row[2] && row[2].trim() !== "" ? row[2] : null;
-
-          return {
-            tabs: Array.isArray(tabs) ? tabs : [],
-            activeTabId: activeTabId,
-          };
-        } catch (parseError) {
-          console.error("Error parsing tabs JSON:", parseError);
-          return null;
-        }
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error getting tabs:", error);
-    return null;
-  }
-};
-
-/**
- * Save user tabs
- */
-export const saveTabs = async (
-  email: string,
-  tabs: any[],
-  activeTabId: string | null,
-  accessToken: string | null = null,
-): Promise<boolean> => {
-  try {
-    await ensureTabsSheetExists(accessToken);
-
-    const loginSpreadsheetId = getLoginSpreadsheetId();
-    const tabsJson = JSON.stringify(tabs);
-    const values = [email, tabsJson, activeTabId || ""];
-
-    return await upsertRowByEmail(
-      loginSpreadsheetId,
-      "Tabs",
-      email,
-      values,
-      accessToken,
-    );
-  } catch (error) {
-    console.error("Error saving tabs:", error);
-    return false;
-  }
-};

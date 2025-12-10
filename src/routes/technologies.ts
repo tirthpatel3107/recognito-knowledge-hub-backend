@@ -12,8 +12,8 @@ import {
 
 const router = express.Router();
 
-// Get all technologies (read-only, no auth needed, but supports OAuth if available)
-router.get("/", technologiesController.getAllTechnologies);
+// Get all technologies (requires auth to get user-specific spreadsheet IDs from UserDetail)
+router.get("/", authenticateToken, technologiesController.getAllTechnologies);
 
 // Create technology (requires Google auth)
 router.post(

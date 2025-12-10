@@ -15,16 +15,20 @@ import {
   getNotesByTab,
   getNotesByColumn,
   getTabHeadings,
+  updateNoteInAllNotes,
   type NotesTab,
   type Note,
 } from "../services/googleSheets/notes";
+import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 /**
  * Get all tabs from "Tabs" sheet
  */
 export const getTabs = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const tabs = await getTabsFromSheet();
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const tabs = await getTabsFromSheet(email, googleToken);
     return sendSuccess(res, tabs, "Tabs retrieved successfully");
   } catch (error: any) {
     return sendError(
@@ -41,7 +45,9 @@ export const getTabs = asyncHandler(async (req: Request, res: Response) => {
 export const getAllNotes = asyncHandler(
   async (req: Request, res: Response) => {
     try {
-      const notes = await getAllNotesFromSheet();
+      const email = req.user?.email || null;
+      const googleToken = getGoogleTokenFromRequest(req);
+      const notes = await getAllNotesFromSheet(email, googleToken);
       return sendSuccess(res, notes, "Notes retrieved successfully");
     } catch (error: any) {
       return sendError(
@@ -64,7 +70,9 @@ export const getNotes = asyncHandler(async (req: Request, res: Response) => {
   }
 
   try {
-    const notes = await getNotesByTab(tabName);
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const notes = await getNotesByTab(tabName, email, googleToken);
     return sendSuccess(res, notes, "Notes retrieved successfully");
   } catch (error: any) {
     return sendError(
@@ -87,7 +95,9 @@ export const getNotesByColumnForTab = asyncHandler(
     }
 
     try {
-      const notesByColumn = await getNotesByColumn(tabName);
+      const email = req.user?.email || null;
+      const googleToken = getGoogleTokenFromRequest(req);
+      const notesByColumn = await getNotesByColumn(tabName, email, googleToken);
       return sendSuccess(
         res,
         notesByColumn,
@@ -115,7 +125,9 @@ export const getHeadings = asyncHandler(
     }
 
     try {
-      const headings = await getTabHeadings(tabName);
+      const email = req.user?.email || null;
+      const googleToken = getGoogleTokenFromRequest(req);
+      const headings = await getTabHeadings(tabName, email, googleToken);
       return sendSuccess(
         res,
         headings,
@@ -130,4 +142,54 @@ export const getHeadings = asyncHandler(
     }
   },
 );
+
+/**
+ * Update a note in "All Notes" sheet
+ */
+export const updateNote = asyncHandler(async (req: Request, res: Response) => {
+  const { rowIndex } = req.params;
+  const { title, description, description2, description3, starred } = req.body;
+
+  if (!rowIndex) {
+    return sendValidationError(res, "Row index is required");
+  }
+
+  const rowIndexNum = parseInt(rowIndex, 10);
+  if (isNaN(rowIndexNum)) {
+    return sendValidationError(res, "Row index must be a valid number");
+  }
+
+  if (!title || !description) {
+    return sendValidationError(res, "Title and description are required");
+  }
+
+  try {
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const success = await updateNoteInAllNotes(
+      rowIndexNum,
+      {
+        title,
+        description,
+        description2,
+        description3,
+        starred,
+      },
+      email,
+      googleToken,
+    );
+
+    if (success) {
+      return sendSuccess(res, null, "Note updated successfully");
+    } else {
+      return sendError(res, "Failed to update note", 500);
+    }
+  } catch (error: any) {
+    return sendError(
+      res,
+      error?.message || "Failed to update note",
+      500,
+    );
+  }
+});
 

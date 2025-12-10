@@ -57,17 +57,6 @@ router.post(
   userController.updateUserColorPaletteHandler,
 );
 
-// Get user tabs
-router.get("/tabs", authenticateToken, userController.getTabsHandler);
-
-// Save user tabs
-router.post(
-  "/tabs",
-  authenticateToken,
-  authenticateGoogleToken,
-  userController.saveTabsHandler,
-);
-
 // Get user-specific spreadsheet IDs
 router.get(
   "/spreadsheet-ids",

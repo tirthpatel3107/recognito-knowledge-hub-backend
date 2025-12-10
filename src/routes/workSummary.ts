@@ -7,11 +7,11 @@ import * as workSummaryController from "../controllers/workSummaryController";
 
 const router = express.Router();
 
-// Get all month sheets (read-only, but supports OAuth if available)
-router.get("/months", workSummaryController.getMonthSheets);
+// Get all month sheets (requires auth to get user-specific spreadsheet IDs from UserDetail)
+router.get("/months", authenticateToken, workSummaryController.getMonthSheets);
 
-// Get work summary entries for a month (read-only, but supports OAuth if available)
-router.get("/entries/:monthSheet", workSummaryController.getEntriesByMonth);
+// Get work summary entries for a month (requires auth to get user-specific spreadsheet IDs from UserDetail)
+router.get("/entries/:monthSheet", authenticateToken, workSummaryController.getEntriesByMonth);
 
 // Create new month sheet (requires Google auth)
 router.post(

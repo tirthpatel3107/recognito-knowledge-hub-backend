@@ -2,12 +2,12 @@
  * Google Sheets Kanban Board Service
  * Handles kanban board task CRUD operations
  */
-import { SPREADSHEET_IDS } from "../../config/googleConfig";
 import {
   getSheetsClient,
   ensureSheetHeaders,
   findSheetByName,
 } from "./utils";
+import { getUserKanbanBoardSpreadsheetId } from "./userProfile";
 
 const KANBAN_SHEET_NAME = "Board";
 const KANBAN_HEADERS = [
@@ -41,18 +41,21 @@ export interface KanbanTaskInput {
 /**
  * Ensure kanban board sheet exists and has correct headers
  */
-const ensureKanbanSheet = async (): Promise<void> => {
+const ensureKanbanSheet = async (
+  spreadsheetId: string,
+  accessToken: string | null = null,
+): Promise<void> => {
   try {
-    if (!SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.KANBAN_BOARD.trim() === "") {
+    if (!spreadsheetId || spreadsheetId.trim() === "") {
       throw new Error("KANBAN_BOARD_SPREADSHEET_ID is not configured");
     }
 
     await ensureSheetHeaders(
-      SPREADSHEET_IDS.KANBAN_BOARD,
+      spreadsheetId,
       KANBAN_SHEET_NAME,
       KANBAN_HEADERS,
       `${KANBAN_SHEET_NAME}!A1:G1`,
-      null,
+      accessToken,
     );
   } catch (error) {
     // Error ensuring kanban sheet
@@ -63,30 +66,32 @@ const ensureKanbanSheet = async (): Promise<void> => {
 /**
  * Get all kanban tasks grouped by column
  */
-export const getKanbanTasks = async (): Promise<Record<string, KanbanTask[]>> => {
+export const getKanbanTasks = async (
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<Record<string, KanbanTask[]>> => {
   try {
-    if (!SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.KANBAN_BOARD.trim() === "") {
-      throw new Error("KANBAN_BOARD_SPREADSHEET_ID is not configured");
-    }
+    // Get user-specific spreadsheet ID from UserDetail sheet
+    const spreadsheetId = await getUserKanbanBoardSpreadsheetId(email, accessToken);
 
-    await ensureKanbanSheet();
+    await ensureKanbanSheet(spreadsheetId, accessToken);
 
     // Find the actual sheet name (handles case variations)
     const sheetInfo = await findSheetByName(
-      SPREADSHEET_IDS.KANBAN_BOARD,
+      spreadsheetId,
       KANBAN_SHEET_NAME,
-      null,
+      accessToken,
     );
     const actualSheetName = sheetInfo.sheetName || KANBAN_SHEET_NAME;
 
     const sheetsClient = getSheetsClient(
+      accessToken,
       null,
-      null,
-      SPREADSHEET_IDS.KANBAN_BOARD,
+      spreadsheetId,
     );
 
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.KANBAN_BOARD,
+      spreadsheetId: spreadsheetId,
       range: `${actualSheetName}!A2:G1000`,
     });
 
@@ -144,26 +149,27 @@ export const getKanbanTasks = async (): Promise<Record<string, KanbanTask[]>> =>
  */
 export const saveKanbanTasks = async (
   tasks: KanbanTask[],
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    if (!SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.KANBAN_BOARD.trim() === "") {
-      throw new Error("KANBAN_BOARD_SPREADSHEET_ID is not configured");
-    }
+    // Get user-specific spreadsheet ID from UserDetail sheet
+    const spreadsheetId = await getUserKanbanBoardSpreadsheetId(email, accessToken);
 
-    await ensureKanbanSheet();
+    await ensureKanbanSheet(spreadsheetId, accessToken);
 
     // Find the actual sheet name (handles case variations)
     const sheetInfo = await findSheetByName(
-      SPREADSHEET_IDS.KANBAN_BOARD,
+      spreadsheetId,
       KANBAN_SHEET_NAME,
-      null,
+      accessToken,
     );
     const actualSheetName = sheetInfo.sheetName || KANBAN_SHEET_NAME;
 
     const sheetsClient = getSheetsClient(
+      accessToken,
       null,
-      null,
-      SPREADSHEET_IDS.KANBAN_BOARD,
+      spreadsheetId,
     );
 
     // Prepare data for Google Sheets
@@ -179,14 +185,14 @@ export const saveKanbanTasks = async (
 
     // Clear existing data (except headers)
     await sheetsClient.spreadsheets.values.clear({
-      spreadsheetId: SPREADSHEET_IDS.KANBAN_BOARD,
+      spreadsheetId: spreadsheetId,
       range: `${actualSheetName}!A2:G1000`,
     });
 
     // Write new data
     if (values.length > 0) {
       await sheetsClient.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_IDS.KANBAN_BOARD,
+        spreadsheetId: spreadsheetId,
         range: `${actualSheetName}!A2`,
         valueInputOption: "RAW",
         requestBody: {

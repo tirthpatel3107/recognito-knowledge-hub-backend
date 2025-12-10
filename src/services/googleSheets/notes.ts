@@ -2,13 +2,13 @@
  * Google Sheets Notes Service
  * Handles notes CRUD operations
  */
-import { SPREADSHEET_IDS } from "../../config/googleConfig";
 import {
   getSheetsClient,
   ensureSheetHeaders,
   getSpreadsheetMetadata,
   getColumnLetter,
 } from "./utils";
+import { getUserNotesSpreadsheetId } from "./userProfile";
 
 const TABS_SHEET_NAME = "Tabs";
 const ALL_NOTES_SHEET_NAME = "All Notes";
@@ -41,18 +41,17 @@ export interface Note {
 /**
  * Ensure Tabs sheet exists and has correct headers
  */
-const ensureTabsSheet = async (): Promise<void> => {
+const ensureTabsSheet = async (
+  spreadsheetId: string,
+  accessToken: string | null = null,
+): Promise<void> => {
   try {
-    if (!SPREADSHEET_IDS.NOTES || SPREADSHEET_IDS.NOTES.trim() === "") {
-      throw new Error("NOTES_SPREADSHEET_ID is not configured");
-    }
-
     await ensureSheetHeaders(
-      SPREADSHEET_IDS.NOTES,
+      spreadsheetId,
       TABS_SHEET_NAME,
       TABS_HEADERS,
       `${TABS_SHEET_NAME}!A1:C1`,
-      null,
+      accessToken,
     );
   } catch (error) {
     // Error ensuring Tabs sheet
@@ -63,18 +62,17 @@ const ensureTabsSheet = async (): Promise<void> => {
 /**
  * Ensure All Notes sheet exists and has correct headers
  */
-const ensureAllNotesSheet = async (): Promise<void> => {
+const ensureAllNotesSheet = async (
+  spreadsheetId: string,
+  accessToken: string | null = null,
+): Promise<void> => {
   try {
-    if (!SPREADSHEET_IDS.NOTES || SPREADSHEET_IDS.NOTES.trim() === "") {
-      throw new Error("NOTES_SPREADSHEET_ID is not configured");
-    }
-
     await ensureSheetHeaders(
-      SPREADSHEET_IDS.NOTES,
+      spreadsheetId,
       ALL_NOTES_SHEET_NAME,
       ALL_NOTES_HEADERS,
       `${ALL_NOTES_SHEET_NAME}!A1:F1`,
-      null,
+      accessToken,
     );
   } catch (error) {
     // Error ensuring All Notes sheet
@@ -85,22 +83,23 @@ const ensureAllNotesSheet = async (): Promise<void> => {
 /**
  * Get all tabs from "Tabs" sheet
  */
-export const getTabsFromSheet = async (): Promise<NotesTab[]> => {
+export const getTabsFromSheet = async (
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<NotesTab[]> => {
   try {
-    if (!SPREADSHEET_IDS.NOTES || SPREADSHEET_IDS.NOTES.trim() === "") {
-      throw new Error("NOTES_SPREADSHEET_ID is not configured");
-    }
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
 
-    await ensureTabsSheet();
+    await ensureTabsSheet(spreadsheetId, accessToken);
 
     const sheetsClient = getSheetsClient(
+      accessToken,
       null,
-      null,
-      SPREADSHEET_IDS.NOTES,
+      spreadsheetId,
     );
 
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.NOTES,
+      spreadsheetId: spreadsheetId,
       range: `${TABS_SHEET_NAME}!A2:C1000`,
     });
 
@@ -108,7 +107,7 @@ export const getTabsFromSheet = async (): Promise<NotesTab[]> => {
     const tabs: NotesTab[] = [];
 
     // Get sheet metadata to find sheetIds
-    const sheets = await getSpreadsheetMetadata(SPREADSHEET_IDS.NOTES, null);
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
 
     rows.forEach((row: string[], index: number) => {
       if (row.length >= 2) {
@@ -141,22 +140,23 @@ export const getTabsFromSheet = async (): Promise<NotesTab[]> => {
 /**
  * Get all notes from "All Notes" sheet
  */
-export const getAllNotesFromSheet = async (): Promise<Note[]> => {
+export const getAllNotesFromSheet = async (
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<Note[]> => {
   try {
-    if (!SPREADSHEET_IDS.NOTES || SPREADSHEET_IDS.NOTES.trim() === "") {
-      throw new Error("NOTES_SPREADSHEET_ID is not configured");
-    }
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
 
-    await ensureAllNotesSheet();
+    await ensureAllNotesSheet(spreadsheetId, accessToken);
 
     const sheetsClient = getSheetsClient(
+      accessToken,
       null,
-      null,
-      SPREADSHEET_IDS.NOTES,
+      spreadsheetId,
     );
 
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.NOTES,
+      spreadsheetId: spreadsheetId,
       range: `${ALL_NOTES_SHEET_NAME}!A1:F1000`,
     });
 
@@ -203,20 +203,22 @@ export const getAllNotesFromSheet = async (): Promise<Note[]> => {
 /**
  * Get notes for a specific tab
  */
-export const getNotesByTab = async (tabName: string): Promise<Note[]> => {
+export const getNotesByTab = async (
+  tabName: string,
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<Note[]> => {
   try {
-    if (!SPREADSHEET_IDS.NOTES || SPREADSHEET_IDS.NOTES.trim() === "") {
-      throw new Error("NOTES_SPREADSHEET_ID is not configured");
-    }
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
 
     const sheetsClient = getSheetsClient(
+      accessToken,
       null,
-      null,
-      SPREADSHEET_IDS.NOTES,
+      spreadsheetId,
     );
 
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.NOTES,
+      spreadsheetId: spreadsheetId,
       range: `${tabName}!A1:Z1000`,
     });
 
@@ -284,20 +286,22 @@ export const getNotesByTab = async (tabName: string): Promise<Note[]> => {
 /**
  * Get headings for a specific tab
  */
-export const getTabHeadings = async (tabName: string): Promise<string[]> => {
+export const getTabHeadings = async (
+  tabName: string,
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<string[]> => {
   try {
-    if (!SPREADSHEET_IDS.NOTES || SPREADSHEET_IDS.NOTES.trim() === "") {
-      throw new Error("NOTES_SPREADSHEET_ID is not configured");
-    }
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
 
     const sheetsClient = getSheetsClient(
+      accessToken,
       null,
-      null,
-      SPREADSHEET_IDS.NOTES,
+      spreadsheetId,
     );
 
     const headingsResponse = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.NOTES,
+      spreadsheetId: spreadsheetId,
       range: `${tabName}!A1:Z1`,
     });
 
@@ -312,17 +316,21 @@ export const getTabHeadings = async (tabName: string): Promise<string[]> => {
  */
 export const getNotesByColumn = async (
   tabName: string,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<Record<string, Note[]>> => {
   try {
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
+
     const sheetsClient = getSheetsClient(
+      accessToken,
       null,
-      null,
-      SPREADSHEET_IDS.NOTES,
+      spreadsheetId,
     );
 
     // Get row 1 to find all columns with headings
     const headingsResponse = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.NOTES,
+      spreadsheetId: spreadsheetId,
       range: `${tabName}!A1:Z1`,
     });
 
@@ -338,7 +346,7 @@ export const getNotesByColumn = async (
     });
 
     // Add notes to their respective columns
-    const notes = await getNotesByTab(tabName);
+    const notes = await getNotesByTab(tabName, email, accessToken);
     notes.forEach((note) => {
       if (!notesByColumn[note.columnLetter]) {
         notesByColumn[note.columnLetter] = [];
@@ -349,6 +357,54 @@ export const getNotesByColumn = async (
     return notesByColumn;
   } catch (error) {
     throw error;
+  }
+};
+
+/**
+ * Update a note in "All Notes" sheet
+ */
+export const updateNoteInAllNotes = async (
+  rowIndex: number,
+  noteData: {
+    title: string;
+    description: string;
+    description2?: string;
+    description3?: string;
+    starred?: boolean;
+  },
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<boolean> => {
+  try {
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
+    
+    // rowIndex is 0-based (row 2 = index 0), so actual row = rowIndex + 2
+    const actualRow = rowIndex + 2;
+    
+    // Update columns B (Title), C (Description1), D (Description2), E (Description3), F (Starred)
+    const starredValue = noteData.starred !== undefined ? noteData.starred : false;
+    const values = [[
+      noteData.title || "",
+      noteData.description || "",
+      noteData.description2 || "",
+      noteData.description3 || "",
+      starredValue ? "true" : "false",
+    ]];
+
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: spreadsheetId,
+      range: `All Notes!B${actualRow}:F${actualRow}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: values,
+      },
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating note in All Notes:", error);
+    return false;
   }
 };
 

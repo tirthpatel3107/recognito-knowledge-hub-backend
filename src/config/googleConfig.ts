@@ -61,9 +61,9 @@ export const SPREADSHEET_IDS: SpreadsheetIds = {
   PRACTICAL_TASKS: "",
   WORK_SUMMARY: "",
   PROJECT_LISTING: "",
-  KANBAN_BOARD: "",
+  KANBAN_BOARD: process.env.KANBAN_BOARD_SPREADSHEET_ID || "",
   TAGS: "",
-  NOTES: "",
+  NOTES: process.env.NOTES_SPREADSHEET_ID || "",
 };
 
 export const DOC_IDS: DocIds = {
@@ -106,30 +106,35 @@ export const applySheetConfig = (
   GOOGLE_CONFIG.SERVICE_ACCOUNT_KEY =
     normalizedConfig.SERVICE_ACCOUNT_KEY ?? GOOGLE_CONFIG.SERVICE_ACCOUNT_KEY;
 
-  SPREADSHEET_IDS.QUESTION_BANK =
-    normalizedConfig.QUESTION_BANK_SPREADSHEET_ID ??
-    SPREADSHEET_IDS.QUESTION_BANK;
-  SPREADSHEET_IDS.PRACTICAL_TASKS =
-    normalizedConfig.PRACTICAL_TASKS_SPREADSHEET_ID ??
-    SPREADSHEET_IDS.PRACTICAL_TASKS;
-  SPREADSHEET_IDS.WORK_SUMMARY =
-    normalizedConfig.WORK_SUMMARY_SPREADSHEET_ID ??
-    SPREADSHEET_IDS.WORK_SUMMARY;
-  SPREADSHEET_IDS.PROJECT_LISTING =
-    normalizedConfig.PROJECT_LISTING_SPREADSHEET_ID ??
-    SPREADSHEET_IDS.PROJECT_LISTING;
-  SPREADSHEET_IDS.KANBAN_BOARD =
-    normalizedConfig.KANBAN_BOARD_SPREADSHEET_ID ??
-    SPREADSHEET_IDS.KANBAN_BOARD;
-  // TAGS defaults to KANBAN_BOARD if TAGS_SPREADSHEET_ID is not configured
-  // This allows the "Tag" tab to be in the same spreadsheet as the kanban board
-  const tagsSpreadsheetId = normalizedConfig.TAGS_SPREADSHEET_ID;
-  SPREADSHEET_IDS.TAGS =
-    tagsSpreadsheetId && tagsSpreadsheetId.trim() !== ""
-      ? tagsSpreadsheetId
-      : SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.TAGS;
-  SPREADSHEET_IDS.NOTES =
-    normalizedConfig.NOTES_SPREADSHEET_ID ?? SPREADSHEET_IDS.NOTES;
+  // Spreadsheet IDs are now loaded from UserDetail tab per-user, not from Config tab
+  // These are kept for backward compatibility but should not be set from config
+  // SPREADSHEET_IDS.QUESTION_BANK =
+  //   normalizedConfig.QUESTION_BANK_SPREADSHEET_ID ??
+  //   SPREADSHEET_IDS.QUESTION_BANK;
+  // SPREADSHEET_IDS.PRACTICAL_TASKS =
+  //   normalizedConfig.PRACTICAL_TASKS_SPREADSHEET_ID ??
+  //   SPREADSHEET_IDS.PRACTICAL_TASKS;
+  // SPREADSHEET_IDS.WORK_SUMMARY =
+  //   normalizedConfig.WORK_SUMMARY_SPREADSHEET_ID ??
+  //   SPREADSHEET_IDS.WORK_SUMMARY;
+  // SPREADSHEET_IDS.PROJECT_LISTING =
+  //   normalizedConfig.PROJECT_LISTING_SPREADSHEET_ID ??
+  //   SPREADSHEET_IDS.PROJECT_LISTING;
+  // SPREADSHEET_IDS.KANBAN_BOARD =
+  //   normalizedConfig.KANBAN_BOARD_SPREADSHEET_ID ??
+  //   process.env.KANBAN_BOARD_SPREADSHEET_ID ??
+  //   SPREADSHEET_IDS.KANBAN_BOARD;
+  // // TAGS defaults to KANBAN_BOARD if TAGS_SPREADSHEET_ID is not configured
+  // // This allows the "Tag" tab to be in the same spreadsheet as the kanban board
+  // const tagsSpreadsheetId = normalizedConfig.TAGS_SPREADSHEET_ID;
+  // SPREADSHEET_IDS.TAGS =
+  //   tagsSpreadsheetId && tagsSpreadsheetId.trim() !== ""
+  //     ? tagsSpreadsheetId
+  //     : SPREADSHEET_IDS.KANBAN_BOARD || SPREADSHEET_IDS.TAGS;
+  // SPREADSHEET_IDS.NOTES =
+  //   normalizedConfig.NOTES_SPREADSHEET_ID ??
+  //   process.env.NOTES_SPREADSHEET_ID ??
+  //   SPREADSHEET_IDS.NOTES;
 
   DOC_IDS.CREDENTIAL = normalizedConfig.CREDENTIAL_DOC_ID ?? DOC_IDS.CREDENTIAL;
   DOC_IDS.WORK_SUMMARY =

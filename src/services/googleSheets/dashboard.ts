@@ -1,10 +1,10 @@
 /**
  * Google Sheets Dashboard Service
  * Handles dashboard card order operations
+ * Card order is stored in UserDetail sheet, column F
  */
 import { SPREADSHEET_IDS } from "../../config/googleConfig";
-import { getSheetsClient, upsertRowByEmail } from "./utils";
-import { syncCardIdsToUserDetail } from "./userProfile";
+import { getSheetsClient, findRowIndexByEmail } from "./utils";
 
 /**
  * Get login spreadsheet ID with fallback to environment variable
@@ -20,56 +20,7 @@ const getLoginSpreadsheetId = (): string => {
 };
 
 /**
- * Ensure DashboardOrder sheet exists
- */
-const ensureDashboardOrderSheetExists = async (
-  accessToken: string | null = null,
-): Promise<boolean> => {
-  try {
-    const loginSpreadsheetId = getLoginSpreadsheetId();
-    const sheetsClient = getSheetsClient(accessToken);
-
-    try {
-      // Try to read from the sheet to check if it exists
-      await sheetsClient.spreadsheets.values.get({
-        spreadsheetId: loginSpreadsheetId,
-        range: "DashboardOrder!A1",
-      });
-      return true;
-    } catch (error: any) {
-      // If sheet doesn't exist (400 error or "Unable to parse range"), create it
-      if (
-        error.code === 400 ||
-        error.message?.includes("Unable to parse range") ||
-        error.message?.includes("not found")
-      ) {
-        await sheetsClient.spreadsheets.batchUpdate({
-          spreadsheetId: loginSpreadsheetId,
-          requestBody: {
-            requests: [
-              {
-                addSheet: {
-                  properties: {
-                    title: "DashboardOrder",
-                  },
-                },
-              },
-            ],
-          },
-        });
-        return true;
-      }
-      throw error;
-    }
-  } catch (error) {
-    console.error("Error ensuring DashboardOrder sheet exists:", error);
-    return false;
-  }
-};
-
-/**
- * Get dashboard card order
- * Automatically populates DashboardOrder based on configured spreadsheet IDs in UserDetail
+ * Get dashboard card order from UserDetail column F
  */
 export const getDashboardCardOrder = async (
   email: string,
@@ -79,41 +30,34 @@ export const getDashboardCardOrder = async (
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
     
-    // First, try to get existing order from DashboardOrder
-    let existingOrder: string[] = [];
-    let hasDashboardOrderEntry = false;
-    
-    try {
-      const response = await sheetsClient.spreadsheets.values.get({
-        spreadsheetId: loginSpreadsheetId,
-        range: "DashboardOrder!A:Z",
-      });
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: loginSpreadsheetId,
+      range: "UserDetail!A2:F100",
+    });
 
-      const rows = response?.data?.values || [];
+    const rows = response?.data?.values || [];
 
-      // Check if user already has an entry in DashboardOrder
-      for (const row of rows) {
-        if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
-          hasDashboardOrderEntry = true;
-          existingOrder = row.slice(1).filter((id: string) => id && id.trim() !== "");
-          break;
+    // Find the row for the current user's email
+    for (const row of rows) {
+      if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
+        // Column F (index 5) contains card IDs separated by newlines
+        const cardIdsString = row[5] || "";
+        if (cardIdsString.trim() !== "") {
+          // Split by newlines and filter out empty strings
+          const cardIds = cardIdsString
+            .split("\n")
+            .map((id: string) => id.trim())
+            .filter((id: string) => id !== "");
+          
+          console.log(`[getDashboardCardOrder] Found card order for ${email}:`, cardIds);
+          return cardIds;
         }
-      }
-    } catch (error: any) {
-      // If DashboardOrder sheet doesn't exist, that's okay - we'll create it
-      if (!error.message?.includes("Unable to parse range") && !error.message?.includes("not found")) {
-        console.error("Error reading DashboardOrder:", error);
+        break;
       }
     }
 
-    // If user has a non-empty existing order, return it
-    if (existingOrder.length > 0) {
-      console.log(`[getDashboardCardOrder] Returning existing order for ${email}:`, existingOrder);
-      return existingOrder;
-    }
-
-    // If no existing order (or empty order), auto-populate based on UserDetail spreadsheet IDs
-    console.log(`[getDashboardCardOrder] No existing order found for ${email}, checking UserDetail...`);
+    // If no card order found, try to auto-populate based on UserDetail spreadsheet IDs
+    console.log(`[getDashboardCardOrder] No card order found for ${email}, checking spreadsheet IDs...`);
     const { getUserSpreadsheetIds } = await import("./userProfile");
     const userSheetIds = await getUserSpreadsheetIds(email, accessToken);
     
@@ -145,9 +89,9 @@ export const getDashboardCardOrder = async (
 
     console.log(`[getDashboardCardOrder] Mapped card IDs for ${email}:`, cardIds);
 
-    // If we found any cards based on spreadsheet IDs, save them to DashboardOrder
+    // If we found any cards based on spreadsheet IDs, save them to UserDetail
     if (cardIds.length > 0) {
-      console.log(`[getDashboardCardOrder] Saving card order to DashboardOrder for ${email}...`);
+      console.log(`[getDashboardCardOrder] Saving card order to UserDetail for ${email}...`);
       const saved = await saveDashboardCardOrder(email, cardIds, accessToken);
       if (saved) {
         console.log(`[getDashboardCardOrder] Successfully saved card order for ${email}`);
@@ -171,7 +115,7 @@ export const getDashboardCardOrder = async (
 };
 
 /**
- * Save dashboard card order
+ * Save dashboard card order to UserDetail column F
  */
 export const saveDashboardCardOrder = async (
   email: string,
@@ -179,30 +123,36 @@ export const saveDashboardCardOrder = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    // Ensure the DashboardOrder sheet exists before trying to save
-    const sheetExists = await ensureDashboardOrderSheetExists(accessToken);
-    if (!sheetExists) {
-      console.error(
-        `[saveDashboardCardOrder] Failed to ensure DashboardOrder sheet exists`,
-      );
+    const loginSpreadsheetId = getLoginSpreadsheetId();
+    const sheetsClient = getSheetsClient(accessToken);
+    
+    const response = await sheetsClient.spreadsheets.values.get({
+      spreadsheetId: loginSpreadsheetId,
+      range: "UserDetail!A2:F100",
+    });
+
+    const rows = response?.data?.values || [];
+    const rowIndex = findRowIndexByEmail(rows, email);
+
+    if (rowIndex === -1) {
+      console.error(`[saveDashboardCardOrder] User not found in UserDetail: ${email}`);
       return false;
     }
 
-    const loginSpreadsheetId = getLoginSpreadsheetId();
-    const success = await upsertRowByEmail(
-      loginSpreadsheetId,
-      "DashboardOrder",
-      email,
-      [email, ...cardOrder],
-      accessToken,
-    );
+    // Join card IDs with newlines for single field storage
+    const cardIdsString = cardOrder.join("\n");
 
-    // Also sync Card IDs to UserDetail tab
-    if (success) {
-      await syncCardIdsToUserDetail(email, cardOrder, accessToken);
-    }
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: loginSpreadsheetId,
+      range: `UserDetail!F${rowIndex}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [[cardIdsString]],
+      },
+    });
 
-    return success;
+    console.log(`[saveDashboardCardOrder] Successfully saved card order for ${email}`);
+    return true;
   } catch (error) {
     console.error(
       `[saveDashboardCardOrder] Error saving dashboard card order for ${email}:`,

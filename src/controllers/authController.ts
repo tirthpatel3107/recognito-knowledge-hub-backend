@@ -142,11 +142,25 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       );
     }
   } catch (error) {
-    return sendError(res, "Failed to verify Google account", 401);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Error verifying Google account during login:", errorMessage);
+    return sendError(res, `Failed to verify Google account: ${errorMessage}`, 401);
   }
 
-  await loadConfigFromSheet(googleAccessToken);
-  initializeGoogleSheets();
+  // Load configuration from sheet (required for JWT_SECRET)
+  try {
+    await loadConfigFromSheet(googleAccessToken);
+    initializeGoogleSheets();
+  } catch (configError) {
+    // Log error - config loading is required for JWT_SECRET
+    const errorMessage = configError instanceof Error ? configError.message : String(configError);
+    console.error("Failed to load configuration during login:", errorMessage);
+    return sendError(
+      res,
+      `Configuration loading failed: ${errorMessage}. Please ensure the Config tab exists in your login spreadsheet.`,
+      500,
+    );
+  }
 
   const tokenTtlSeconds = extractTokenTtl(accessTokenExpiresIn, expiresIn);
   storeGoogleToken(email, googleAccessToken, {

@@ -30,6 +30,8 @@ if (!process.env?.LOGIN_SPREADSHEET_ID) {
   console.log(`[Backend] LOGIN_SPREADSHEET_ID loaded from .env file`);
 }
 
+// NOTES_SPREADSHEET_ID will be loaded from UserDetail tab in Login spreadsheet during login
+
 // Import routes
 import authRoutes from "./routes/auth.js";
 import technologiesRoutes from "./routes/technologies.js";

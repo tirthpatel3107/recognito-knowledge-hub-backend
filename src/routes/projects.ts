@@ -7,8 +7,8 @@ import * as projectsController from "../controllers/projectsController";
 
 const router = express.Router();
 
-// Get all projects (read-only, but supports OAuth if available)
-router.get("/", projectsController.getAllProjects);
+// Get all projects (requires auth to get user-specific spreadsheet IDs from UserDetail)
+router.get("/", authenticateToken, projectsController.getAllProjects);
 
 // Add project (requires Google auth)
 router.post(

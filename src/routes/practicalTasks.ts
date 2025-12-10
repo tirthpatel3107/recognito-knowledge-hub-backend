@@ -7,12 +7,13 @@ import * as practicalTasksController from "../controllers/practicalTasksControll
 
 const router = express.Router();
 
-// Get all practical tasks (read-only, but supports OAuth if available)
-router.get("/", practicalTasksController.getAllPracticalTasks);
+// Get all practical tasks (requires auth to get user-specific spreadsheet IDs from UserDetail)
+router.get("/", authenticateToken, practicalTasksController.getAllPracticalTasks);
 
-// Get practical tasks for a technology (read-only, but supports OAuth if available)
+// Get practical tasks for a technology (requires auth to get user-specific spreadsheet IDs from UserDetail)
 router.get(
   "/:technologyName",
+  authenticateToken,
   practicalTasksController.getPracticalTasksByTechnologyHandler,
 );
 

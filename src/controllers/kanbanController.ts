@@ -10,6 +10,7 @@ import {
   sendValidationError,
 } from "../utils/responseHelper";
 import { getKanbanTasks, saveKanbanTasks, type KanbanTask } from "../services/googleSheets/kanban";
+import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 /**
  * Get all kanban tasks grouped by column
@@ -17,7 +18,9 @@ import { getKanbanTasks, saveKanbanTasks, type KanbanTask } from "../services/go
 export const getTasks = asyncHandler(
   async (req: Request, res: Response) => {
     try {
-      const tasksByColumn = await getKanbanTasks();
+      const email = req.user?.email || null;
+      const googleToken = getGoogleTokenFromRequest(req);
+      const tasksByColumn = await getKanbanTasks(email, googleToken);
       return sendSuccess(res, tasksByColumn, "Tasks retrieved successfully");
     } catch (error: any) {
       return sendError(
@@ -41,6 +44,9 @@ export const saveTasks = asyncHandler(
     }
 
     try {
+      const email = req.user?.email || null;
+      const googleToken = getGoogleTokenFromRequest(req);
+
       // Flatten tasks from all columns
       const allTasks: KanbanTask[] = [];
       if (tasks) {
@@ -51,7 +57,7 @@ export const saveTasks = asyncHandler(
         });
       }
 
-      const success = await saveKanbanTasks(allTasks);
+      const success = await saveKanbanTasks(allTasks, email, googleToken);
       if (success) {
         return sendSuccess(res, null, "Tasks saved successfully");
       } else {

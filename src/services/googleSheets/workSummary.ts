@@ -2,7 +2,6 @@
  * Google Sheets Work Summary Service
  * Handles work summary entries and month sheet operations
  */
-import { SPREADSHEET_IDS } from "../../config/googleConfig";
 import type {
   WorkSummaryEntry,
   WorkSummaryEntryInput,
@@ -17,7 +16,9 @@ import {
   getMonthNameFromDate,
   getSpreadsheetMetadata,
   clearSpreadsheetMetadataCache,
+  isServiceAccountInitialized,
 } from "./utils";
+import { getUserWorkSummarySpreadsheetId } from "./userProfile";
 
 const WORK_SUMMARY_HEADERS = ["No", "ProjectName", "WorkSummary", "Date"];
 
@@ -26,10 +27,11 @@ const WORK_SUMMARY_HEADERS = ["No", "ProjectName", "WorkSummary", "Date"];
  */
 const ensureWorkSummaryHeaders = async (
   monthSheet: string,
+  spreadsheetId: string,
   accessToken: string | null = null,
 ): Promise<void> => {
   await ensureSheetHeaders(
-    SPREADSHEET_IDS.WORK_SUMMARY,
+    spreadsheetId,
     monthSheet,
     WORK_SUMMARY_HEADERS,
     `${monthSheet}!A1:D1`,
@@ -41,12 +43,26 @@ const ensureWorkSummaryHeaders = async (
  * Get all month sheets
  */
 export const getWorkSummaryMonthSheets = async (
+  email: string | null = null,
   accessToken: string | null = null,
 ): Promise<string[]> => {
   try {
+    // Get user-specific spreadsheet ID from UserDetail tab
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+
+    // Check if service account is initialized (required for WORK_SUMMARY spreadsheet)
+    if (!isServiceAccountInitialized()) {
+      console.error(
+        "Service account is not initialized. Cannot access Work Summary spreadsheet.",
+      );
+      throw new Error(
+        "Service account is not initialized. Please configure SERVICE_ACCOUNT_KEY in your config sheet.",
+      );
+    }
+
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId: spreadsheetId,
     });
 
     const sheets = response?.data?.sheets || [];
@@ -57,8 +73,21 @@ export const getWorkSummaryMonthSheets = async (
         const lowerTitle = title?.toLowerCase().trim();
         return lowerTitle !== "sheet1" && lowerTitle !== "project list";
       });
-  } catch (error) {
-    return [];
+  } catch (error: any) {
+    console.error("Error getting work summary month sheets:", error);
+    
+    // Provide more specific error messages for common issues
+    if (error?.response?.status === 404) {
+      const errorMessage = error?.response?.data?.error?.message || error?.message || "";
+      if (errorMessage.includes("spreadsheet") || errorMessage.includes("404")) {
+        throw new Error(
+          `Work Summary spreadsheet not found. Please verify that WORK_SUMMARY_SPREADSHEET_ID is set in the UserDetail tab (column J) for your user and the service account has access to it.`,
+        );
+      }
+    }
+    
+    // Re-throw the error so the API can return a proper error response
+    throw error;
   }
 };
 
@@ -66,12 +95,13 @@ export const getWorkSummaryMonthSheets = async (
  * Reorder Work Summary sheets in descending order (newest first)
  */
 const reorderWorkSummarySheets = async (
+  spreadsheetId: string,
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
     const sheets = await getSpreadsheetMetadata(
-      SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId,
       accessToken,
     );
 
@@ -140,7 +170,7 @@ const reorderWorkSummarySheets = async (
 
     if (requests.length > 0) {
       await sheetsClient.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+        spreadsheetId: spreadsheetId,
         requestBody: { requests },
       });
     }
@@ -156,11 +186,16 @@ const reorderWorkSummarySheets = async (
  */
 export const createWorkSummaryMonthSheet = async (
   monthName: string,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    // Get user-specific spreadsheet ID from UserDetail tab
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    
+    const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId: spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -178,14 +213,14 @@ export const createWorkSummaryMonthSheet = async (
     const newSheetId =
       response.data.replies?.[0]?.addSheet?.properties?.sheetId;
     if (newSheetId !== undefined) {
-      await ensureWorkSummaryHeaders(monthName);
+      await ensureWorkSummaryHeaders(monthName, spreadsheetId, accessToken);
     }
 
     // Reorder sheets in descending order after creating new sheet
-    await reorderWorkSummarySheets();
+    await reorderWorkSummarySheets(spreadsheetId, accessToken);
 
     // Clear cache after modification
-    clearSpreadsheetMetadataCache(SPREADSHEET_IDS.WORK_SUMMARY);
+    clearSpreadsheetMetadataCache(spreadsheetId);
 
     return true;
   } catch (error) {
@@ -198,14 +233,27 @@ export const createWorkSummaryMonthSheet = async (
  */
 export const getWorkSummaryEntriesByMonth = async (
   monthSheet: string,
+  email: string | null = null,
   accessToken: string | null = null,
 ): Promise<WorkSummaryEntry[]> => {
-  await ensureWorkSummaryHeaders(monthSheet, accessToken);
+  // Get user-specific spreadsheet ID from UserDetail tab
+  const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+  await ensureWorkSummaryHeaders(monthSheet, spreadsheetId, accessToken);
 
   try {
+    // Check if service account is initialized (required for WORK_SUMMARY spreadsheet)
+    if (!isServiceAccountInitialized()) {
+      console.error(
+        "Service account is not initialized. Cannot access Work Summary spreadsheet.",
+      );
+      throw new Error(
+        "Service account is not initialized. Please configure SERVICE_ACCOUNT_KEY in your config sheet.",
+      );
+    }
+
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId: spreadsheetId,
       range: `${monthSheet}!A2:E1000`,
     });
 
@@ -217,8 +265,24 @@ export const getWorkSummaryEntriesByMonth = async (
       workSummary: row[2] || "",
       date: parseDateFromGoogleSheets(row[3] || ""),
     }));
-  } catch (error) {
-    return [];
+  } catch (error: any) {
+    console.error(
+      `Error getting work summary entries for month ${monthSheet}:`,
+      error,
+    );
+    
+    // Provide more specific error messages for common issues
+    if (error?.response?.status === 404) {
+      const errorMessage = error?.response?.data?.error?.message || error?.message || "";
+      if (errorMessage.includes("spreadsheet") || errorMessage.includes("404")) {
+        throw new Error(
+          `Work Summary spreadsheet not found. Please verify that WORK_SUMMARY_SPREADSHEET_ID is set in the UserDetail tab (column J) for your user and the service account has access to it.`,
+        );
+      }
+    }
+    
+    // Re-throw the error so the API can return a proper error response
+    throw error;
   }
 };
 
@@ -228,13 +292,17 @@ export const getWorkSummaryEntriesByMonth = async (
 export const addWorkSummaryEntry = async (
   monthSheet: string,
   entryData: WorkSummaryEntryInput,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    await ensureWorkSummaryHeaders(monthSheet);
+    // Get user-specific spreadsheet ID from UserDetail tab
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    await ensureWorkSummaryHeaders(monthSheet, spreadsheetId, accessToken);
 
-    const sheetsClient = getSheetsClient();
+    const sheetsClient = getSheetsClient(accessToken);
     const spreadsheetResponse = await sheetsClient.spreadsheets.get({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId: spreadsheetId,
     });
 
     const sheets = spreadsheetResponse.data.sheets || [];
@@ -250,7 +318,7 @@ export const addWorkSummaryEntry = async (
 
     // Get all existing entries
     const entriesResponse = await sheetsClient.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId: spreadsheetId,
       range: `${monthSheet}!A2:D1000`,
     });
 
@@ -326,7 +394,7 @@ export const addWorkSummaryEntry = async (
     });
 
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId: spreadsheetId,
       requestBody: {
         requests,
       },
@@ -350,7 +418,7 @@ export const addWorkSummaryEntry = async (
 
       if (serialNumberUpdates.length > 0) {
         await sheetsClient.spreadsheets.values.batchUpdate({
-          spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+          spreadsheetId: spreadsheetId,
           requestBody: {
             valueInputOption: "RAW",
             data: serialNumberUpdates,
@@ -372,10 +440,14 @@ export const updateWorkSummaryEntry = async (
   monthSheet: string,
   rowIndex: number,
   entryData: WorkSummaryEntryInput,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
-    const sheets = await getSpreadsheetMetadata(SPREADSHEET_IDS.WORK_SUMMARY);
+    // Get user-specific spreadsheet ID from UserDetail tab
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken);
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
     const targetSheet = sheets.find(
       (sheet: any) => sheet.properties.title === monthSheet,
     );
@@ -388,7 +460,7 @@ export const updateWorkSummaryEntry = async (
     const actualRow = rowIndex + 2;
 
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId: spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -442,13 +514,17 @@ export const deleteWorkSummaryEntry = async (
   monthSheet: string,
   rowIndex: number,
   sheetId: number,
+  email: string | null = null,
+  accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const sheetsClient = getSheetsClient();
+    // Get user-specific spreadsheet ID from UserDetail tab
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken);
     const actualRow = rowIndex + 2;
 
     await sheetsClient.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+      spreadsheetId: spreadsheetId,
       requestBody: {
         requests: [
           {
@@ -466,6 +542,88 @@ export const deleteWorkSummaryEntry = async (
     });
     return true;
   } catch (error) {
+    return false;
+  }
+};
+
+/**
+ * Update project names in all work summary sheets
+ */
+export const updateProjectNameInWorkSummary = async (
+  oldProjectName: string,
+  newProjectName: string,
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<boolean> => {
+  try {
+    // Get user-specific spreadsheet ID from UserDetail tab
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+
+    // Check if service account is initialized
+    if (!isServiceAccountInitialized()) {
+      console.error(
+        "Service account is not initialized. Cannot update project names in work summary.",
+      );
+      return false;
+    }
+
+    // Get all month sheets
+    const monthSheets = await getWorkSummaryMonthSheets(email, accessToken);
+
+    // Collect all updates across all sheets
+    const batchUpdates: any[] = [];
+    let totalUpdates = 0;
+
+    const sheetsClient = getSheetsClient(accessToken);
+
+    // Iterate through each month sheet
+    for (const monthSheet of monthSheets) {
+      // Get all entries from this sheet
+      const entries = await getWorkSummaryEntriesByMonth(monthSheet, email, accessToken);
+
+      // Find entries with matching project name
+      for (let i = 0; i < entries.length; i++) {
+        if (entries[i].projectName === oldProjectName) {
+          const rowNumber = i + 2; // +2 for header and 1-based index
+
+          batchUpdates.push({
+            range: `${monthSheet}!B${rowNumber}`, // Column B is ProjectName
+            values: [[newProjectName]],
+          });
+          totalUpdates++;
+        }
+      }
+    }
+
+    // If there are updates, batch update them
+    if (batchUpdates.length > 0) {
+      // Batch update can only handle 100 requests at a time, so split if needed
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < batchUpdates.length; i += BATCH_SIZE) {
+        const batch = batchUpdates.slice(i, i + BATCH_SIZE);
+
+        await sheetsClient.spreadsheets.values.batchUpdate({
+          spreadsheetId: spreadsheetId,
+          requestBody: {
+            valueInputOption: "RAW",
+            data: batch,
+          },
+        });
+      }
+
+      console.log(
+        `Updated ${totalUpdates} work summary entries with new project name: ${newProjectName}`,
+      );
+      return true;
+    } else {
+      // No work summary entries found with old project name
+      console.log(
+        `No work summary entries found with project name: ${oldProjectName}`,
+      );
+      return true; // No updates needed, but not an error
+    }
+  } catch (error) {
+    console.error("Error updating project names in work summary:", error);
     return false;
   }
 };

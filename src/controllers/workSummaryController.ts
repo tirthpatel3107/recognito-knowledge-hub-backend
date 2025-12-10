@@ -14,7 +14,6 @@ import {
   setUserCredentials,
   getSheetsClient,
 } from "../services/googleSheets";
-import { SPREADSHEET_IDS } from "../config/googleConfig";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
@@ -23,16 +22,19 @@ import {
   sendNotFound,
 } from "../utils/responseHelper";
 import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
+import { getUserWorkSummarySpreadsheetId } from "../services/googleSheets/userProfile";
 
 // Helper to get sheet ID by name
 const getSheetIdByName = async (
   sheetName: string,
+  email: string | null,
   accessToken: string | null = null,
 ): Promise<number | undefined> => {
+  const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
   const sheetsClient = getSheetsClient(accessToken);
 
   const response = await sheetsClient.spreadsheets.get({
-    spreadsheetId: SPREADSHEET_IDS.WORK_SUMMARY,
+    spreadsheetId: spreadsheetId,
   });
 
   const sheetsList = response.data.sheets || [];
@@ -48,8 +50,9 @@ const getSheetIdByName = async (
  */
 export const getMonthSheets = asyncHandler(
   async (req: Request, res: Response) => {
+    const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
-    const monthSheets = await getWorkSummaryMonthSheets(googleToken);
+    const monthSheets = await getWorkSummaryMonthSheets(email, googleToken);
     return sendSuccess(res, monthSheets);
   },
 );
@@ -60,8 +63,9 @@ export const getMonthSheets = asyncHandler(
 export const getEntriesByMonth = asyncHandler(
   async (req: Request, res: Response) => {
     const { monthSheet } = req.params;
+    const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
-    const entries = await getWorkSummaryEntriesByMonth(monthSheet, googleToken);
+    const entries = await getWorkSummaryEntriesByMonth(monthSheet, email, googleToken);
     return sendSuccess(res, entries);
   },
 );
@@ -73,12 +77,14 @@ export const createMonthSheet = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { monthName } = req.body;
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
 
     if (!monthName) {
       return sendValidationError(res, "Month name is required");
     }
 
-    const success = await createWorkSummaryMonthSheet(monthName);
+    const success = await createWorkSummaryMonthSheet(monthName, email, googleToken);
 
     if (success) {
       return sendSuccess(res, null, "Month sheet created successfully");
@@ -103,22 +109,24 @@ export const addWorkSummaryEntryHandler = asyncHandler(
       );
     }
 
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
     const targetMonthSheet = monthSheet || getMonthNameFromDate(date);
 
     if (!targetMonthSheet) {
       return sendValidationError(res, "Invalid date format");
     }
 
-    const existingSheets = await getWorkSummaryMonthSheets(req.googleToken!);
+    const existingSheets = await getWorkSummaryMonthSheets(email, googleToken);
     if (!existingSheets.includes(targetMonthSheet)) {
-      await createWorkSummaryMonthSheet(targetMonthSheet);
+      await createWorkSummaryMonthSheet(targetMonthSheet, email, googleToken);
     }
 
     const success = await addWorkSummaryEntry(targetMonthSheet, {
       projectName,
       workSummary,
       date,
-    });
+    }, email, googleToken);
 
     if (success) {
       return sendSuccess(res, null, "Work summary entry added successfully");
@@ -144,25 +152,27 @@ export const updateWorkSummaryEntryHandler = asyncHandler(
       );
     }
 
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
     const newMonth = getMonthNameFromDate(date);
     const oldMonth = oldDate ? getMonthNameFromDate(oldDate) : monthSheet;
 
     if (oldDate && oldMonth !== newMonth && newMonth) {
-      const sheetId = await getSheetIdByName(monthSheet, req.googleToken!);
+      const sheetId = await getSheetIdByName(monthSheet, email, googleToken);
       if (sheetId) {
-        await deleteWorkSummaryEntry(monthSheet, parseInt(rowIndex), sheetId);
+        await deleteWorkSummaryEntry(monthSheet, parseInt(rowIndex), sheetId, email, googleToken);
       }
 
-      const existingSheets = await getWorkSummaryMonthSheets(req.googleToken!);
+      const existingSheets = await getWorkSummaryMonthSheets(email, googleToken);
       if (!existingSheets.includes(newMonth)) {
-        await createWorkSummaryMonthSheet(newMonth);
+        await createWorkSummaryMonthSheet(newMonth, email, googleToken);
       }
 
       const success = await addWorkSummaryEntry(newMonth, {
         projectName,
         workSummary,
         date,
-      });
+      }, email, googleToken);
 
       if (success) {
         return sendSuccess(
@@ -174,10 +184,14 @@ export const updateWorkSummaryEntryHandler = asyncHandler(
         return sendError(res, "Failed to update work summary entry", 500);
       }
     } else {
+      const email = req.user?.email || null;
+      const googleToken = getGoogleTokenFromRequest(req);
       const success = await updateWorkSummaryEntry(
         monthSheet,
         parseInt(rowIndex),
         { projectName, workSummary, date },
+        email,
+        googleToken,
       );
 
       if (success) {
@@ -200,8 +214,10 @@ export const deleteWorkSummaryEntryHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { monthSheet, rowIndex } = req.params;
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
 
-    const sheetId = await getSheetIdByName(monthSheet, req.googleToken!);
+    const sheetId = await getSheetIdByName(monthSheet, email, googleToken);
 
     if (!sheetId) {
       return sendNotFound(res, "Month sheet");
@@ -211,6 +227,8 @@ export const deleteWorkSummaryEntryHandler = asyncHandler(
       monthSheet,
       parseInt(rowIndex),
       sheetId,
+      email,
+      googleToken,
     );
 
     if (success) {
