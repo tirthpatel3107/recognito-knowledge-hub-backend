@@ -265,6 +265,7 @@ export const reorderProjects = async (
       spreadsheetId,
       sheetName,
       updatedProjects.length,
+      2,
       accessToken,
     );
 

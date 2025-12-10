@@ -381,6 +381,7 @@ export const deletePracticalTask = async (
       spreadsheetId,
       technologyName,
       tasksArrayAfterDelete.length,
+      2,
       accessToken,
     );
 
@@ -462,6 +463,7 @@ export const reorderPracticalTasks = async (
       spreadsheetId,
       technologyName,
       tasksArray.length,
+      2,
       accessToken,
     );
 

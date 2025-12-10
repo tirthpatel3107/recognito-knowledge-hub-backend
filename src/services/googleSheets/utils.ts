@@ -579,7 +579,7 @@ export const findSheetByName = async (
       
       // Log character codes for first few characters to detect hidden characters
       if (title.length > 0) {
-        const charCodes = Array.from(title.slice(0, 20)).map(c => c.charCodeAt(0));
+        const charCodes = (Array.from(title.slice(0, 20)) as string[]).map((c) => c.charCodeAt(0));
         console.log(`[findSheetByName] Sheet ${index} first 20 char codes:`, charCodes);
       }
     });
