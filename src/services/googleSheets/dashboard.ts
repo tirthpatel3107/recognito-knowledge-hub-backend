@@ -49,7 +49,6 @@ export const getDashboardCardOrder = async (
             .map((id: string) => id.trim())
             .filter((id: string) => id !== "");
           
-          console.log(`[getDashboardCardOrder] Found card order for ${email}:`, cardIds);
           return cardIds;
         }
         break;
@@ -57,17 +56,8 @@ export const getDashboardCardOrder = async (
     }
 
     // If no card order found, try to auto-populate based on UserDetail spreadsheet IDs
-    console.log(`[getDashboardCardOrder] No card order found for ${email}, checking spreadsheet IDs...`);
     const { getUserSpreadsheetIds } = await import("./userProfile");
     const userSheetIds = await getUserSpreadsheetIds(email, accessToken);
-    
-    console.log(`[getDashboardCardOrder] User spreadsheet IDs for ${email}:`, {
-      questionBank: userSheetIds.questionBank ? "✓" : "✗",
-      practicalTasks: userSheetIds.practicalTasks ? "✓" : "✗",
-      workSummary: userSheetIds.workSummary ? "✓" : "✗",
-      kanbanBoard: userSheetIds.kanbanBoard ? "✓" : "✗",
-      notes: userSheetIds.notes ? "✓" : "✗",
-    });
 
     // Map spreadsheet IDs to card IDs
     const cardIds: string[] = [];
@@ -87,20 +77,12 @@ export const getDashboardCardOrder = async (
       cardIds.push("notes");
     }
 
-    console.log(`[getDashboardCardOrder] Mapped card IDs for ${email}:`, cardIds);
-
     // If we found any cards based on spreadsheet IDs, save them to UserDetail
     if (cardIds.length > 0) {
-      console.log(`[getDashboardCardOrder] Saving card order to UserDetail for ${email}...`);
       const saved = await saveDashboardCardOrder(email, cardIds, accessToken);
       if (saved) {
-        console.log(`[getDashboardCardOrder] Successfully saved card order for ${email}`);
         return cardIds;
-      } else {
-        console.error(`[getDashboardCardOrder] Failed to save card order for ${email}`);
       }
-    } else {
-      console.log(`[getDashboardCardOrder] No spreadsheet IDs found in UserDetail for ${email}`);
     }
 
     return [];
@@ -151,7 +133,6 @@ export const saveDashboardCardOrder = async (
       },
     });
 
-    console.log(`[saveDashboardCardOrder] Successfully saved card order for ${email}`);
     return true;
   } catch (error) {
     console.error(

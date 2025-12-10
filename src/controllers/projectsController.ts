@@ -132,38 +132,21 @@ export const updateProjectHandler = asyncHandler(
  */
 export const deleteProjectHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    console.log(`[deleteProjectHandler] DELETE request received`);
-    console.log(`[deleteProjectHandler] req.params:`, req.params);
-    console.log(`[deleteProjectHandler] req.url:`, req.url);
-    console.log(`[deleteProjectHandler] req.path:`, req.path);
-    
     setUserCredentials(req.googleToken!);
     const { rowIndex } = req.params;
-    
-    console.log(`[deleteProjectHandler] rowIndex from params: "${rowIndex}"`);
-    console.log(`[deleteProjectHandler] parsed rowIndex: ${parseInt(rowIndex)}`);
 
     if (!rowIndex || isNaN(parseInt(rowIndex))) {
-      console.log(`[deleteProjectHandler] Invalid rowIndex: ${rowIndex}`);
       return sendValidationError(res, `Invalid rowIndex parameter: ${rowIndex}. Must be a number.`);
     }
 
     const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
-    console.log(`[deleteProjectHandler] Getting Project List sheet ID for email: ${email}`);
     
     const result = await getProjectListSheetId(email, googleToken);
-    console.log(`[deleteProjectHandler] getProjectListSheetId result:`, {
-      hasSheetId: result.sheetId !== undefined && result.sheetId !== null,
-      sheetId: result.sheetId,
-      sheetIdType: typeof result.sheetId,
-      availableSheets: result.availableSheets,
-    });
 
     // Check if sheetId exists (using !== undefined to handle 0 as valid sheetId)
     if (result.sheetId === undefined || result.sheetId === null) {
       const availableSheets = result.availableSheets?.join(", ") || "none";
-      console.log(`[deleteProjectHandler] Project List sheet not found. Available: ${availableSheets}`);
       return sendNotFound(
         res,
         `Project List sheet (tab) not found in Work Summary spreadsheet. Available sheets (tabs): ${availableSheets}. Please ensure the tab is named exactly "Project List".`,
@@ -171,15 +154,12 @@ export const deleteProjectHandler = asyncHandler(
     }
 
     const parsedRowIndex = parseInt(rowIndex);
-    console.log(`[deleteProjectHandler] Attempting to delete project at rowIndex: ${parsedRowIndex} (will delete row ${parsedRowIndex + 2} in sheet)`);
     
     const success = await deleteProject(parsedRowIndex, result.sheetId, email, googleToken);
 
     if (success) {
-      console.log(`[deleteProjectHandler] Project deleted successfully`);
       return sendSuccess(res, null, "Project deleted successfully");
     } else {
-      console.log(`[deleteProjectHandler] Failed to delete project`);
       return sendError(res, "Failed to delete project", 500);
     }
   },

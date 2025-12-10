@@ -611,15 +611,9 @@ export const updateProjectNameInWorkSummary = async (
         });
       }
 
-      console.log(
-        `Updated ${totalUpdates} work summary entries with new project name: ${newProjectName}`,
-      );
       return true;
     } else {
       // No work summary entries found with old project name
-      console.log(
-        `No work summary entries found with project name: ${oldProjectName}`,
-      );
       return true; // No updates needed, but not an error
     }
   } catch (error) {

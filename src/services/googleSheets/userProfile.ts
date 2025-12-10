@@ -191,22 +191,9 @@ export const getUserSpreadsheetIds = async (
     });
 
     const rows = response?.data?.values || [];
-    console.log(`[getUserSpreadsheetIds] Searching for email: ${email}`);
-    console.log(`[getUserSpreadsheetIds] Found ${rows.length} rows in UserDetail`);
     
     for (const row of rows) {
       if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
-        console.log(`[getUserSpreadsheetIds] Found matching row for ${email}`);
-        console.log(`[getUserSpreadsheetIds] Row length: ${row.length}`);
-        console.log(`[getUserSpreadsheetIds] Row data:`, {
-          email: row[0],
-          colH_index7: row[7] || "(empty)",
-          colI_index8: row[8] || "(empty)",
-          colJ_index9: row[9] || "(empty)",
-          colK_index10: row[10] || "(empty)",
-          colL_index11: row[11] || "(empty)",
-        });
-        
         const result = {
           questionBank: row[7] && row[7].trim() !== "" ? row[7].trim() : undefined,
           practicalTasks: row[8] && row[8].trim() !== "" ? row[8].trim() : undefined,
@@ -215,12 +202,9 @@ export const getUserSpreadsheetIds = async (
           notes: row[11] && row[11].trim() !== "" ? row[11].trim() : undefined,
         };
         
-        console.log(`[getUserSpreadsheetIds] Extracted spreadsheet IDs:`, result);
         return result;
       }
     }
-    
-    console.log(`[getUserSpreadsheetIds] No matching row found for ${email}`);
     return {};
   } catch (error) {
     console.error(`[getUserSpreadsheetIds] Error getting user spreadsheet IDs for ${email}:`, error);

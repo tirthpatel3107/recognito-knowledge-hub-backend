@@ -565,33 +565,10 @@ export const findSheetByName = async (
 
     const normalizedTarget = normalizeString(sheetName);
 
-    // Debug: Log all sheet titles and their properties
-    console.log(`[findSheetByName] Looking for sheet: "${sheetName}"`);
-    console.log(`[findSheetByName] Available sheets:`, availableSheets);
-    console.log(`[findSheetByName] Normalized target: "${normalizedTarget}"`);
-    
-    // Log all sheet properties for debugging
-    sheetsList.forEach((sheet: any, index: number) => {
-      const title = sheet.properties?.title || "";
-      const normalized = normalizeString(title);
-      const sheetId = sheet.properties?.sheetId;
-      console.log(`[findSheetByName] Sheet ${index}: title="${title}" (length: ${title.length}), normalized="${normalized}", sheetId=${sheetId}, hasSheetId=${!!sheetId}`);
-      
-      // Log character codes for first few characters to detect hidden characters
-      if (title.length > 0) {
-        const charCodes = (Array.from(title.slice(0, 20)) as string[]).map((c) => c.charCodeAt(0));
-        console.log(`[findSheetByName] Sheet ${index} first 20 char codes:`, charCodes);
-      }
-    });
-
     // Strategy 1: Exact case-sensitive match (most strict)
     let foundSheet = sheetsList.find((sheet: any) => {
       return sheet.properties?.title === sheetName;
     });
-
-    if (foundSheet) {
-      console.log(`[findSheetByName] Found sheet using exact case-sensitive match: "${foundSheet.properties?.title}"`);
-    }
 
     // Strategy 2: Normalized case-insensitive match (handles whitespace variations)
     if (!foundSheet) {
@@ -601,9 +578,6 @@ export const findSheetByName = async (
         return normalized === normalizedTarget;
       });
 
-      if (foundSheet) {
-        console.log(`[findSheetByName] Found sheet using normalized match: "${foundSheet.properties?.title}"`);
-      }
     }
 
     // Strategy 3: Partial match (contains all words)
@@ -614,9 +588,6 @@ export const findSheetByName = async (
         return targetWords.length > 0 && targetWords.every((word) => title.includes(word));
       });
       
-      if (foundSheet) {
-        console.log(`[findSheetByName] Found sheet using partial match: "${foundSheet.properties?.title}"`);
-      }
     }
 
     // Strategy 4: Starts with match (for cases where sheet name might have suffix)
@@ -626,37 +597,20 @@ export const findSheetByName = async (
         return title.startsWith(normalizedTarget);
       });
       
-      if (foundSheet) {
-        console.log(`[findSheetByName] Found sheet using starts-with match: "${foundSheet.properties?.title}"`);
-      }
     }
 
     if (!foundSheet) {
-      console.log(`[findSheetByName] Sheet not found after all matching strategies`);
       return { sheetName, availableSheets };
     }
 
     if (!foundSheet.properties?.title) {
-      console.log(`[findSheetByName] Found sheet but title is missing`);
       return { sheetName, availableSheets };
     }
 
-    // Log the full structure of found sheet for debugging
-    console.log(`[findSheetByName] Found sheet structure:`, JSON.stringify({
-      hasProperties: !!foundSheet.properties,
-      title: foundSheet.properties?.title,
-      sheetId: foundSheet.properties?.sheetId,
-      sheetIdType: typeof foundSheet.properties?.sheetId,
-      fullProperties: foundSheet.properties,
-    }, null, 2));
-
     // Check if sheetId exists (using !== undefined to handle 0 as valid)
     if (foundSheet.properties?.sheetId === undefined || foundSheet.properties?.sheetId === null) {
-      console.log(`[findSheetByName] Found sheet "${foundSheet.properties.title}" but sheetId is missing or null`);
       return { sheetName: foundSheet.properties.title, availableSheets };
     }
-
-    console.log(`[findSheetByName] Successfully found sheet: "${foundSheet.properties.title}" with sheetId: ${foundSheet.properties.sheetId}`);
     return {
       sheetName: foundSheet.properties.title,
       sheetId: foundSheet.properties.sheetId,
