@@ -7,6 +7,7 @@ import * as technologiesController from "../controllers/technologiesController";
 import { writeLimiter } from "../middleware/rateLimiter";
 import {
   validateTechnology,
+  validateTechnologyUpdate,
   validateSheetId,
 } from "../middleware/inputValidation";
 
@@ -32,7 +33,7 @@ router.put(
   authenticateToken,
   authenticateGoogleToken,
   validateSheetId,
-  validateTechnology,
+  validateTechnologyUpdate,
   technologiesController.updateTechnologyHandler,
 );
 

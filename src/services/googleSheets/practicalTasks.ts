@@ -309,6 +309,11 @@ export const deletePracticalTask = async (
 ): Promise<boolean> => {
   try {
     const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
+    if (!spreadsheetId) {
+      console.error("Failed to get spreadsheet ID for practical tasks");
+      return false;
+    }
+
     const sheetsClient = getSheetsClient(accessToken);
     const actualRow = rowIndex + 2;
 
@@ -321,9 +326,27 @@ export const deletePracticalTask = async (
       (s: any) => s.properties.title === technologyName,
     );
     if (!sheet) {
+      console.error(`Sheet not found for technology: ${technologyName}`);
       return false;
     }
     const sheetId = sheet.properties.sheetId;
+
+    // Validate that the row exists before trying to delete
+    const existingTasks = await getPracticalTasksByTechnology(
+      technologyName,
+      email,
+      accessToken,
+    );
+    const tasksArray = Array.isArray(existingTasks)
+      ? existingTasks
+      : existingTasks.data;
+
+    if (rowIndex < 0 || rowIndex >= tasksArray.length) {
+      console.error(
+        `Invalid row index: ${rowIndex}. Total tasks: ${tasksArray.length}`,
+      );
+      return false;
+    }
 
     // Delete the row
     await sheetsClient.spreadsheets.batchUpdate({
@@ -350,14 +373,14 @@ export const deletePracticalTask = async (
       email,
       accessToken,
     );
-    const tasksArray = Array.isArray(updatedTasks)
+    const tasksArrayAfterDelete = Array.isArray(updatedTasks)
       ? updatedTasks
       : updatedTasks.data;
 
     await updateSerialNumbers(
       spreadsheetId,
       technologyName,
-      tasksArray.length,
+      tasksArrayAfterDelete.length,
       accessToken,
     );
 
@@ -366,6 +389,11 @@ export const deletePracticalTask = async (
 
     return true;
   } catch (error) {
+    console.error("Error deleting practical task:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return false;
   }
 };

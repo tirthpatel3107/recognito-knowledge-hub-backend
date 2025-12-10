@@ -79,6 +79,25 @@ export const validateTechnology = [
 ];
 
 /**
+ * Validation rules for technology update operations (uses oldName and newName)
+ */
+export const validateTechnologyUpdate = [
+  body("oldName")
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Old technology name must be between 1 and 100 characters")
+    .matches(/^[a-zA-Z0-9\s\-_]+$/)
+    .withMessage("Old technology name contains invalid characters"),
+  body("newName")
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Technology name must be between 1 and 100 characters")
+    .matches(/^[a-zA-Z0-9\s\-_]+$/)
+    .withMessage("Technology name contains invalid characters"),
+  validate,
+];
+
+/**
  * Validation rules for question operations
  */
 export const validateQuestion = [

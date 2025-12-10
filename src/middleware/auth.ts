@@ -4,7 +4,10 @@
  */
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { getServiceConfigValue } from "../config/googleConfig";
+import {
+  getServiceConfigValue,
+  isConfigLoaded,
+} from "../config/googleConfig";
 import { getGoogleToken } from "../services/googleTokenStore";
 
 interface UserPayload {
@@ -22,7 +25,11 @@ declare global {
 
 const getJwtSecret = (): string | null => {
   const secret = getServiceConfigValue("JWT_SECRET");
-  return typeof secret === "string" ? secret : null;
+  // Return null if secret is not a string, is empty, or is null/undefined
+  if (typeof secret !== "string" || !secret.trim()) {
+    return null;
+  }
+  return secret;
 };
 
 export const authenticateToken = (
@@ -34,7 +41,29 @@ export const authenticateToken = (
 
   if (!jwtSecret) {
     // JWT secret is not configured in the Config sheet
-    res.status(500).json({ error: "Server configuration error" });
+    // This can happen if:
+    // 1. Server restarted and config hasn't been loaded yet (config is loaded during login)
+    // 2. Config failed to load from Google Sheets
+    // 3. JWT_SECRET is missing or empty in the Config sheet
+    const configLoaded = isConfigLoaded();
+    console.error(
+      `[Auth Middleware] JWT_SECRET is not configured. Config loaded: ${configLoaded}. Config must be loaded from Google Sheets during login.`,
+    );
+    
+    let errorMessage =
+      "JWT secret is not configured. Please ensure the Config tab exists in your login spreadsheet and contains JWT_SECRET.";
+    if (!configLoaded) {
+      errorMessage +=
+        " Configuration has not been loaded yet. If you just restarted the server, please log in again to reload the configuration.";
+    } else {
+      errorMessage +=
+        " Configuration was loaded but JWT_SECRET is missing or empty. Please check your Config sheet.";
+    }
+
+    res.status(500).json({
+      error: "Server configuration error",
+      message: errorMessage,
+    });
     return;
   }
 

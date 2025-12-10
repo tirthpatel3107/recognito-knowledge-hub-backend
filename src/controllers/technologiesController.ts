@@ -114,29 +114,10 @@ export const deleteTechnologyHandler = asyncHandler(
     const email = req.user!.email;
     const googleToken = getGoogleTokenFromRequest(req);
     const { sheetId } = req.params;
-    const { password } = req.body;
-
-    // Validate password is provided
-    if (!password) {
-      return sendValidationError(
-        res,
-        "Password is required to delete technology",
-      );
-    }
 
     // Validate Google token is available
     if (!googleToken) {
       return sendError(res, "Google access token is required", 401);
-    }
-
-    // Verify password before allowing deletion
-    const isPasswordValid = await authenticateUser(
-      email,
-      password,
-      googleToken,
-    );
-    if (!isPasswordValid) {
-      return sendError(res, "Incorrect password", 401);
     }
 
     // Set user credentials and proceed with deletion

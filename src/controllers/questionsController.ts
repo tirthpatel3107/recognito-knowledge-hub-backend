@@ -122,16 +122,15 @@ export const deleteQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
     setUserCredentials(req.googleToken!);
     const { technologyName, rowIndex } = req.params;
+    const email = req.user?.email || null;
 
     // Get sheet ID for the technology
-    const technologies = await getTechnologies(req.googleToken!);
+    const technologies = await getTechnologies(req.googleToken!, email);
     const tech = technologies.find((t) => t.name === technologyName);
 
     if (!tech || tech.sheetId === undefined) {
       return sendNotFound(res, "Technology");
     }
-
-    const email = req.user?.email || null;
     const success = await deleteQuestion(
       technologyName,
       parseInt(rowIndex),
@@ -173,15 +172,15 @@ export const reorderQuestionsHandler = asyncHandler(
       );
     }
 
+    const email = req.user?.email || null;
+
     // Get sheet ID for the technology
-    const technologies = await getTechnologies(req.googleToken!);
+    const technologies = await getTechnologies(req.googleToken!, email);
     const tech = technologies.find((t) => t.name === technologyName);
 
     if (!tech || tech.sheetId === undefined) {
       return sendNotFound(res, "Technology");
     }
-
-    const email = req.user?.email || null;
     const success = await reorderQuestions(
       technologyName,
       oldIndex,
