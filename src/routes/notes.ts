@@ -30,12 +30,36 @@ router.get(
   notesController.getHeadings,
 );
 
+// Add a note to "All Notes" sheet
+router.post(
+  "/all",
+  authenticateToken,
+  authenticateGoogleToken,
+  notesController.addNote,
+);
+
 // Update a note in "All Notes" sheet
 router.put(
   "/all/:rowIndex",
   authenticateToken,
   authenticateGoogleToken,
   notesController.updateNote,
+);
+
+// Update note tag (ID in column A) in "All Notes" sheet
+router.put(
+  "/all/:rowIndex/tag",
+  authenticateToken,
+  authenticateGoogleToken,
+  notesController.updateNoteTagHandler,
+);
+
+// Delete a note from "All Notes" sheet
+router.delete(
+  "/all/:rowIndex",
+  authenticateToken,
+  authenticateGoogleToken,
+  notesController.deleteNote,
 );
 
 export default router;

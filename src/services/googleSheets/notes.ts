@@ -361,6 +361,116 @@ export const getNotesByColumn = async (
 };
 
 /**
+ * Add a note to "All Notes" sheet
+ */
+export const addNoteToAllNotes = async (
+  noteData: {
+    tabId: string;
+    title: string;
+    description?: string;
+    description2?: string;
+    description3?: string;
+    starred?: boolean;
+  },
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<boolean> => {
+  try {
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
+    await ensureAllNotesSheet(spreadsheetId, accessToken);
+    
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
+    
+    // Get existing notes to find the next row
+    const existingNotes = await getAllNotesFromSheet(email, accessToken);
+    const nextRow = existingNotes.length > 0 
+      ? Math.max(...existingNotes.map((n) => n.rowIndex)) + 3 
+      : 2; // First note goes in row 2 (row 1 = header)
+    
+    // Prepare values: [ID, Title, Description1, Description2, Description3, Starred]
+    const starredValue = noteData.starred !== undefined ? noteData.starred : false;
+    const values = [[
+      noteData.tabId || "",
+      noteData.title || "",
+      noteData.description || "",
+      noteData.description2 || "",
+      noteData.description3 || "",
+      starredValue ? "true" : "false",
+    ]];
+
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: spreadsheetId,
+      range: `All Notes!A${nextRow}:F${nextRow}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: values,
+      },
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error adding note to All Notes:", error);
+    return false;
+  }
+};
+
+/**
+ * Delete a note from "All Notes" sheet
+ */
+export const deleteNoteFromAllNotes = async (
+  rowIndex: number,
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<boolean> => {
+  try {
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
+    await ensureAllNotesSheet(spreadsheetId, accessToken);
+    
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
+    
+    // Get the sheet ID for "All Notes" sheet
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
+    const allNotesSheet = sheets.find(
+      (sheet: any) => sheet.properties?.title?.toLowerCase() === ALL_NOTES_SHEET_NAME.toLowerCase(),
+    );
+    
+    if (!allNotesSheet?.properties?.sheetId) {
+      console.error("Could not find 'All Notes' sheet");
+      return false;
+    }
+    
+    const sheetId = allNotesSheet.properties.sheetId;
+    
+    // rowIndex is 0-based (row 2 = index 0), so actual row = rowIndex + 2
+    // For deleteDimension, we need 0-based index, so rowIndex + 1 (row 2 = index 1)
+    const actualRow = rowIndex + 2;
+    
+    await sheetsClient.spreadsheets.batchUpdate({
+      spreadsheetId: spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: sheetId,
+                dimension: "ROWS",
+                startIndex: actualRow - 1, // 0-based index
+                endIndex: actualRow,
+              },
+            },
+          },
+        ],
+      },
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error deleting note from All Notes:", error);
+    return false;
+  }
+};
+
+/**
  * Update a note in "All Notes" sheet
  */
 export const updateNoteInAllNotes = async (
@@ -404,6 +514,41 @@ export const updateNoteInAllNotes = async (
     return true;
   } catch (error) {
     console.error("Error updating note in All Notes:", error);
+    return false;
+  }
+};
+
+/**
+ * Update note tag (ID in column A) in "All Notes" sheet
+ */
+export const updateNoteTag = async (
+  rowIndex: number,
+  newTabId: string,
+  email: string | null = null,
+  accessToken: string | null = null,
+): Promise<boolean> => {
+  try {
+    const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
+    
+    // rowIndex is 0-based (row 2 = index 0), so actual row = rowIndex + 2
+    const actualRow = rowIndex + 2;
+    
+    // Update column A (ID/Tag)
+    const values = [[newTabId]];
+
+    await sheetsClient.spreadsheets.values.update({
+      spreadsheetId: spreadsheetId,
+      range: `All Notes!A${actualRow}`,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: values,
+      },
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating note tag:", error);
     return false;
   }
 };

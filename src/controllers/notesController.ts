@@ -15,7 +15,10 @@ import {
   getNotesByTab,
   getNotesByColumn,
   getTabHeadings,
+  addNoteToAllNotes,
   updateNoteInAllNotes,
+  updateNoteTag,
+  deleteNoteFromAllNotes,
   type NotesTab,
   type Note,
 } from "../services/googleSheets/notes";
@@ -144,6 +147,46 @@ export const getHeadings = asyncHandler(
 );
 
 /**
+ * Add a note to "All Notes" sheet
+ */
+export const addNote = asyncHandler(async (req: Request, res: Response) => {
+  const { tabId, title, description, description2, description3, starred } = req.body;
+
+  if (!tabId || !title) {
+    return sendValidationError(res, "Tab ID and title are required");
+  }
+
+  try {
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const success = await addNoteToAllNotes(
+      {
+        tabId,
+        title,
+        description,
+        description2,
+        description3,
+        starred,
+      },
+      email,
+      googleToken,
+    );
+
+    if (success) {
+      return sendSuccess(res, null, "Note added successfully");
+    } else {
+      return sendError(res, "Failed to add note", 500);
+    }
+  } catch (error: any) {
+    return sendError(
+      res,
+      error?.message || "Failed to add note",
+      500,
+    );
+  }
+});
+
+/**
  * Update a note in "All Notes" sheet
  */
 export const updateNote = asyncHandler(async (req: Request, res: Response) => {
@@ -188,6 +231,88 @@ export const updateNote = asyncHandler(async (req: Request, res: Response) => {
     return sendError(
       res,
       error?.message || "Failed to update note",
+      500,
+    );
+  }
+});
+
+/**
+ * Update note tag (ID in column A) in "All Notes" sheet
+ */
+export const updateNoteTagHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { rowIndex } = req.params;
+  const { newTabId } = req.body;
+
+  if (!rowIndex) {
+    return sendValidationError(res, "Row index is required");
+  }
+
+  const rowIndexNum = parseInt(rowIndex, 10);
+  if (isNaN(rowIndexNum)) {
+    return sendValidationError(res, "Row index must be a valid number");
+  }
+
+  if (!newTabId || typeof newTabId !== "string" || newTabId.trim() === "") {
+    return sendValidationError(res, "New tab ID is required");
+  }
+
+  try {
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const success = await updateNoteTag(
+      rowIndexNum,
+      newTabId.trim(),
+      email,
+      googleToken,
+    );
+
+    if (success) {
+      return sendSuccess(res, null, "Note tag updated successfully");
+    } else {
+      return sendError(res, "Failed to update note tag", 500);
+    }
+  } catch (error: any) {
+    return sendError(
+      res,
+      error?.message || "Failed to update note tag",
+      500,
+    );
+  }
+});
+
+/**
+ * Delete a note from "All Notes" sheet
+ */
+export const deleteNote = asyncHandler(async (req: Request, res: Response) => {
+  const { rowIndex } = req.params;
+
+  if (!rowIndex) {
+    return sendValidationError(res, "Row index is required");
+  }
+
+  const rowIndexNum = parseInt(rowIndex, 10);
+  if (isNaN(rowIndexNum)) {
+    return sendValidationError(res, "Row index must be a valid number");
+  }
+
+  try {
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const success = await deleteNoteFromAllNotes(
+      rowIndexNum,
+      email,
+      googleToken,
+    );
+
+    if (success) {
+      return sendSuccess(res, null, "Note deleted successfully");
+    } else {
+      return sendError(res, "Failed to delete note", 500);
+    }
+  } catch (error: any) {
+    return sendError(
+      res,
+      error?.message || "Failed to delete note",
       500,
     );
   }
