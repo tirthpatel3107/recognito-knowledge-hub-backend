@@ -28,10 +28,7 @@ const ensurePracticalTaskHeaders = async (
 ): Promise<void> => {
   try {
     // Check if the sheet exists
-    const sheets = await getSpreadsheetMetadata(
-      spreadsheetId,
-      accessToken,
-    );
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
     const sheetExists = sheets.some(
       (sheet: any) =>
         sheet.properties?.title?.toLowerCase() === technologyName.toLowerCase(),
@@ -81,7 +78,10 @@ export const getPracticalTasks = async (
   accessToken: string | null = null,
 ): Promise<PracticalTask[]> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -112,7 +112,10 @@ export const getPracticalTasksByTechnology = async (
   limit?: number,
 ): Promise<PracticalTask[] | PaginatedResponse<PracticalTask>> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -135,8 +138,12 @@ export const getPracticalTasksByTechnology = async (
       // Extract priority from question text if present
       const priorityRegex = /\|PRIORITY:(low|medium|high)\|$/;
       const priorityMatch = question.match(priorityRegex);
-      const priority = priorityMatch ? (priorityMatch[1] as "low" | "medium" | "high") : "low";
-      const cleanQuestion = priorityMatch ? question.replace(priorityRegex, "").trim() : question;
+      const priority = priorityMatch
+        ? (priorityMatch[1] as "low" | "medium" | "high")
+        : "low";
+      const cleanQuestion = priorityMatch
+        ? question.replace(priorityRegex, "").trim()
+        : question;
 
       return {
         id: `pt-${index}`,
@@ -197,12 +204,18 @@ export const getPracticalTasksByTechnology = async (
  */
 const buildPracticalTaskRowData = (
   serialNumber: number,
-  taskData: { question: string; answer: string; example?: string; priority?: "low" | "medium" | "high" },
+  taskData: {
+    question: string;
+    answer: string;
+    example?: string;
+    priority?: "low" | "medium" | "high";
+  },
 ): any[] => {
   // Append priority to question if provided
-  const questionWithPriority = taskData.priority && taskData.priority !== "low"
-    ? `${taskData.question || ""}|PRIORITY:${taskData.priority}|`
-    : taskData.question || "";
+  const questionWithPriority =
+    taskData.priority && taskData.priority !== "low"
+      ? `${taskData.question || ""}|PRIORITY:${taskData.priority}|`
+      : taskData.question || "";
 
   const questionChunks = splitTextIntoChunks(questionWithPriority);
   const answerChunks = splitTextIntoChunks(taskData.answer || "");
@@ -230,13 +243,25 @@ const buildPracticalTaskRowData = (
  */
 export const addPracticalTask = async (
   technologyName: string,
-  taskData: { question: string; answer: string; example?: string; priority?: "low" | "medium" | "high" },
+  taskData: {
+    question: string;
+    answer: string;
+    example?: string;
+    priority?: "low" | "medium" | "high";
+  },
   email: string | null = null,
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
-    await ensurePracticalTaskHeaders(technologyName, spreadsheetId, accessToken);
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
+      accessToken,
+    );
+    await ensurePracticalTaskHeaders(
+      technologyName,
+      spreadsheetId,
+      accessToken,
+    );
 
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
@@ -271,12 +296,20 @@ export const addPracticalTask = async (
 export const updatePracticalTask = async (
   technologyName: string,
   rowIndex: number,
-  taskData: { question: string; answer: string; example?: string; priority?: "low" | "medium" | "high" },
+  taskData: {
+    question: string;
+    answer: string;
+    example?: string;
+    priority?: "low" | "medium" | "high";
+  },
   email: string | null = null,
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken);
     const actualRow = rowIndex + 2;
 
@@ -308,7 +341,10 @@ export const deletePracticalTask = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
+      accessToken,
+    );
     if (!spreadsheetId) {
       console.error("Failed to get spreadsheet ID for practical tasks");
       return false;
@@ -318,10 +354,7 @@ export const deletePracticalTask = async (
     const actualRow = rowIndex + 2;
 
     // Get the sheet ID for the technology (using cached metadata)
-    const sheets = await getSpreadsheetMetadata(
-      spreadsheetId,
-      accessToken,
-    );
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
     const sheet = sheets.find(
       (s: any) => s.properties.title === technologyName,
     );
@@ -414,13 +447,13 @@ export const reorderPracticalTasks = async (
       return true;
     }
 
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(accessToken);
-    // Get the sheet ID for the technology (using cached metadata)
-    const sheets = await getSpreadsheetMetadata(
-      spreadsheetId,
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
       accessToken,
     );
+    const sheetsClient = getSheetsClient(accessToken);
+    // Get the sheet ID for the technology (using cached metadata)
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
     const sheet = sheets.find(
       (s: any) => s.properties.title === technologyName,
     );
@@ -454,7 +487,11 @@ export const reorderPracticalTasks = async (
     });
 
     // Update serial numbers
-    const updatedTasks = await getPracticalTasksByTechnology(technologyName, email, accessToken);
+    const updatedTasks = await getPracticalTasksByTechnology(
+      technologyName,
+      email,
+      accessToken,
+    );
     const tasksArray = Array.isArray(updatedTasks)
       ? updatedTasks
       : updatedTasks.data;

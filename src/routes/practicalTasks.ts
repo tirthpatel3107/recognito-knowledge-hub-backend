@@ -8,7 +8,11 @@ import * as practicalTasksController from "../controllers/practicalTasksControll
 const router = express.Router();
 
 // Get all practical tasks (requires auth to get user-specific spreadsheet IDs from UserDetail)
-router.get("/", authenticateToken, practicalTasksController.getAllPracticalTasks);
+router.get(
+  "/",
+  authenticateToken,
+  practicalTasksController.getAllPracticalTasks,
+);
 
 // Get practical tasks for a technology (requires auth to get user-specific spreadsheet IDs from UserDetail)
 router.get(

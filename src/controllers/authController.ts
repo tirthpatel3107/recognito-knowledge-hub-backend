@@ -144,7 +144,11 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Error verifying Google account during login:", errorMessage);
-    return sendError(res, `Failed to verify Google account: ${errorMessage}`, 401);
+    return sendError(
+      res,
+      `Failed to verify Google account: ${errorMessage}`,
+      401,
+    );
   }
 
   // Load configuration from sheet (required for JWT_SECRET)
@@ -153,7 +157,8 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     initializeGoogleSheets();
   } catch (configError) {
     // Log error - config loading is required for JWT_SECRET
-    const errorMessage = configError instanceof Error ? configError.message : String(configError);
+    const errorMessage =
+      configError instanceof Error ? configError.message : String(configError);
     console.error("Failed to load configuration during login:", errorMessage);
     return sendError(
       res,

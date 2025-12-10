@@ -22,7 +22,6 @@ router.post(
   userController.saveDashboardCardOrderHandler,
 );
 
-
 // Get user profile (username and email from UserDetail sheet)
 router.get("/profile", authenticateToken, userController.getUserProfileHandler);
 

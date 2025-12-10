@@ -29,7 +29,10 @@ export const getAllPracticalTaskTechnologies = asyncHandler(
     try {
       const email = req.user?.email || null;
       const googleToken = getGoogleTokenFromRequest(req);
-      const technologies = await getPracticalTaskTechnologies(googleToken, email);
+      const technologies = await getPracticalTaskTechnologies(
+        googleToken,
+        email,
+      );
       return sendSuccess(res, technologies);
     } catch (error: any) {
       // Provide more helpful error messages
@@ -75,7 +78,11 @@ export const createPracticalTaskTechnologyHandler = asyncHandler(
       return sendValidationError(res, "Technology name is required");
     }
 
-    const success = await createPracticalTaskTechnology(name, email, googleToken);
+    const success = await createPracticalTaskTechnology(
+      name,
+      email,
+      googleToken,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Technology created successfully");
@@ -132,7 +139,11 @@ export const deletePracticalTaskTechnologyHandler = asyncHandler(
 
     // Set user credentials and proceed with deletion
     setUserCredentials(googleToken);
-    const result = await deletePracticalTaskTechnology(parseInt(sheetId), email, googleToken);
+    const result = await deletePracticalTaskTechnology(
+      parseInt(sheetId),
+      email,
+      googleToken,
+    );
 
     if (result.success) {
       return sendSuccess(res, null, "Technology deleted successfully");
@@ -156,7 +167,11 @@ export const reorderPracticalTaskTechnologiesHandler = asyncHandler(
       return sendValidationError(res, "technologyIds must be an array");
     }
 
-    const success = await reorderPracticalTaskTechnologies(technologyIds, email, googleToken);
+    const success = await reorderPracticalTaskTechnologies(
+      technologyIds,
+      email,
+      googleToken,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Technologies reordered successfully");

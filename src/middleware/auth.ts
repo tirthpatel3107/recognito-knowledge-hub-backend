@@ -4,10 +4,7 @@
  */
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import {
-  getServiceConfigValue,
-  isConfigLoaded,
-} from "../config/googleConfig";
+import { getServiceConfigValue, isConfigLoaded } from "../config/googleConfig";
 import { getGoogleToken } from "../services/googleTokenStore";
 
 interface UserPayload {
@@ -49,7 +46,7 @@ export const authenticateToken = (
     console.error(
       `[Auth Middleware] JWT_SECRET is not configured. Config loaded: ${configLoaded}. Config must be loaded from Google Sheets during login.`,
     );
-    
+
     let errorMessage =
       "JWT secret is not configured. Please ensure the Config tab exists in your login spreadsheet and contains JWT_SECRET.";
     if (!configLoaded) {

@@ -14,4 +14,3 @@ router.get("/tasks", authenticateToken, kanbanController.getTasks);
 router.post("/tasks", authenticateToken, kanbanController.saveTasks);
 
 export default router;
-

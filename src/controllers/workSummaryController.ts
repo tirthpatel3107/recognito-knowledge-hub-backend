@@ -30,7 +30,10 @@ const getSheetIdByName = async (
   email: string | null,
   accessToken: string | null = null,
 ): Promise<number | undefined> => {
-  const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+  const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+    email,
+    accessToken,
+  );
   const sheetsClient = getSheetsClient(accessToken);
 
   const response = await sheetsClient.spreadsheets.get({
@@ -65,7 +68,11 @@ export const getEntriesByMonth = asyncHandler(
     const { monthSheet } = req.params;
     const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
-    const entries = await getWorkSummaryEntriesByMonth(monthSheet, email, googleToken);
+    const entries = await getWorkSummaryEntriesByMonth(
+      monthSheet,
+      email,
+      googleToken,
+    );
     return sendSuccess(res, entries);
   },
 );
@@ -84,7 +91,11 @@ export const createMonthSheet = asyncHandler(
       return sendValidationError(res, "Month name is required");
     }
 
-    const success = await createWorkSummaryMonthSheet(monthName, email, googleToken);
+    const success = await createWorkSummaryMonthSheet(
+      monthName,
+      email,
+      googleToken,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Month sheet created successfully");
@@ -122,11 +133,16 @@ export const addWorkSummaryEntryHandler = asyncHandler(
       await createWorkSummaryMonthSheet(targetMonthSheet, email, googleToken);
     }
 
-    const success = await addWorkSummaryEntry(targetMonthSheet, {
-      projectName,
-      workSummary,
-      date,
-    }, email, googleToken);
+    const success = await addWorkSummaryEntry(
+      targetMonthSheet,
+      {
+        projectName,
+        workSummary,
+        date,
+      },
+      email,
+      googleToken,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Work summary entry added successfully");
@@ -160,19 +176,33 @@ export const updateWorkSummaryEntryHandler = asyncHandler(
     if (oldDate && oldMonth !== newMonth && newMonth) {
       const sheetId = await getSheetIdByName(monthSheet, email, googleToken);
       if (sheetId) {
-        await deleteWorkSummaryEntry(monthSheet, parseInt(rowIndex), sheetId, email, googleToken);
+        await deleteWorkSummaryEntry(
+          monthSheet,
+          parseInt(rowIndex),
+          sheetId,
+          email,
+          googleToken,
+        );
       }
 
-      const existingSheets = await getWorkSummaryMonthSheets(email, googleToken);
+      const existingSheets = await getWorkSummaryMonthSheets(
+        email,
+        googleToken,
+      );
       if (!existingSheets.includes(newMonth)) {
         await createWorkSummaryMonthSheet(newMonth, email, googleToken);
       }
 
-      const success = await addWorkSummaryEntry(newMonth, {
-        projectName,
-        workSummary,
-        date,
-      }, email, googleToken);
+      const success = await addWorkSummaryEntry(
+        newMonth,
+        {
+          projectName,
+          workSummary,
+          date,
+        },
+        email,
+        googleToken,
+      );
 
       if (success) {
         return sendSuccess(

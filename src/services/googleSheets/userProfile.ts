@@ -173,7 +173,6 @@ export const updateUserPassword = async (
   }
 };
 
-
 /**
  * Get user-specific spreadsheet IDs from UserDetail
  * Columns: H=QUESTION_BANK, I=PRACTICAL_TASKS, J=WORK_SUMMARY, K=KANBAN_BOARD, L=NOTES
@@ -191,23 +190,30 @@ export const getUserSpreadsheetIds = async (
     });
 
     const rows = response?.data?.values || [];
-    
+
     for (const row of rows) {
       if (row.length > 0 && row[0]?.toLowerCase() === email.toLowerCase()) {
         const result = {
-          questionBank: row[7] && row[7].trim() !== "" ? row[7].trim() : undefined,
-          practicalTasks: row[8] && row[8].trim() !== "" ? row[8].trim() : undefined,
-          workSummary: row[9] && row[9].trim() !== "" ? row[9].trim() : undefined,
-          kanbanBoard: row[10] && row[10].trim() !== "" ? row[10].trim() : undefined,
+          questionBank:
+            row[7] && row[7].trim() !== "" ? row[7].trim() : undefined,
+          practicalTasks:
+            row[8] && row[8].trim() !== "" ? row[8].trim() : undefined,
+          workSummary:
+            row[9] && row[9].trim() !== "" ? row[9].trim() : undefined,
+          kanbanBoard:
+            row[10] && row[10].trim() !== "" ? row[10].trim() : undefined,
           notes: row[11] && row[11].trim() !== "" ? row[11].trim() : undefined,
         };
-        
+
         return result;
       }
     }
     return {};
   } catch (error) {
-    console.error(`[getUserSpreadsheetIds] Error getting user spreadsheet IDs for ${email}:`, error);
+    console.error(
+      `[getUserSpreadsheetIds] Error getting user spreadsheet IDs for ${email}:`,
+      error,
+    );
     if (error instanceof Error) {
       console.error(`[getUserSpreadsheetIds] Error message:`, error.message);
       console.error(`[getUserSpreadsheetIds] Error stack:`, error.stack);
@@ -235,7 +241,9 @@ export const getUserQuestionBankSpreadsheetId = async (
   if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
     return envSpreadsheetId;
   }
-  throw new Error("QUESTION_BANK_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column H) for your user.");
+  throw new Error(
+    "QUESTION_BANK_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column H) for your user.",
+  );
 };
 
 export const getUserPracticalTasksSpreadsheetId = async (
@@ -253,7 +261,9 @@ export const getUserPracticalTasksSpreadsheetId = async (
   if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
     return envSpreadsheetId;
   }
-  throw new Error("PRACTICAL_TASKS_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column I) for your user.");
+  throw new Error(
+    "PRACTICAL_TASKS_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column I) for your user.",
+  );
 };
 
 export const getUserWorkSummarySpreadsheetId = async (
@@ -271,7 +281,9 @@ export const getUserWorkSummarySpreadsheetId = async (
   if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
     return envSpreadsheetId;
   }
-  throw new Error("WORK_SUMMARY_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column J) for your user.");
+  throw new Error(
+    "WORK_SUMMARY_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column J) for your user.",
+  );
 };
 
 export const getUserKanbanBoardSpreadsheetId = async (
@@ -289,7 +301,9 @@ export const getUserKanbanBoardSpreadsheetId = async (
   if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
     return envSpreadsheetId;
   }
-  throw new Error("KANBAN_BOARD_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column K) for your user.");
+  throw new Error(
+    "KANBAN_BOARD_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column K) for your user.",
+  );
 };
 
 export const getUserNotesSpreadsheetId = async (
@@ -307,7 +321,9 @@ export const getUserNotesSpreadsheetId = async (
   if (envSpreadsheetId && envSpreadsheetId.trim() !== "") {
     return envSpreadsheetId;
   }
-  throw new Error("NOTES_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column L) for your user.");
+  throw new Error(
+    "NOTES_SPREADSHEET_ID is not configured. Please set it in the UserDetail tab (column L) for your user.",
+  );
 };
 
 /**
@@ -402,4 +418,3 @@ export const updateUserColorPalette = async (
     return false;
   }
 };
-

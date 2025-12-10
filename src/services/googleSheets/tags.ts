@@ -26,15 +26,8 @@ const ensureTagsSheet = async (
       return;
     }
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
-    const sheets = await getSpreadsheetMetadata(
-      spreadsheetId,
-      accessToken,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
     const tagsSheet = sheets.find(
       (sheet: any) => sheet.properties?.title?.toLowerCase() === "tags",
     );
@@ -105,11 +98,7 @@ export const getTags = async (
     const spreadsheetId = await getUserTagsSpreadsheetId(email, accessToken);
 
     await ensureTagsSheet(spreadsheetId, accessToken);
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     if (!spreadsheetId || spreadsheetId.trim() === "") {
       return [];
@@ -152,11 +141,7 @@ export const addTag = async (
     }
 
     await ensureTagsSheet(spreadsheetId, accessToken);
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -198,11 +183,7 @@ export const updateTag = async (
       return false;
     }
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     const actualRow = rowIndex + 2;
 
@@ -236,17 +217,10 @@ export const deleteTag = async (
       return false;
     }
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     // Get the sheet ID for Tags (using cached metadata)
-    const sheets = await getSpreadsheetMetadata(
-      spreadsheetId,
-      accessToken,
-    );
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
     const tagsSheet = sheets.find(
       (sheet: any) => sheet.properties?.title?.toLowerCase() === "tags",
     );
@@ -288,4 +262,3 @@ export const deleteTag = async (
     return false;
   }
 };
-

@@ -59,7 +59,6 @@ export const saveDashboardCardOrderHandler = asyncHandler(
   },
 );
 
-
 /**
  * Get user profile
  */

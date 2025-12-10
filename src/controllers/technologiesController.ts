@@ -96,7 +96,13 @@ export const updateTechnologyHandler = asyncHandler(
       return sendValidationError(res, "Old name and new name are required");
     }
 
-    const success = await updateTechnology(oldName, newName, parseInt(sheetId), email, req.googleToken!);
+    const success = await updateTechnology(
+      oldName,
+      newName,
+      parseInt(sheetId),
+      email,
+      req.googleToken!,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Technology updated successfully");
@@ -122,7 +128,11 @@ export const deleteTechnologyHandler = asyncHandler(
 
     // Set user credentials and proceed with deletion
     setUserCredentials(googleToken);
-    const result = await deleteTechnology(parseInt(sheetId), email, googleToken);
+    const result = await deleteTechnology(
+      parseInt(sheetId),
+      email,
+      googleToken,
+    );
 
     if (result.success) {
       return sendSuccess(res, null, "Technology deleted successfully");
@@ -145,7 +155,11 @@ export const reorderTechnologiesHandler = asyncHandler(
       return sendValidationError(res, "technologyIds must be an array");
     }
 
-    const success = await reorderTechnologies(technologyIds, email, req.googleToken!);
+    const success = await reorderTechnologies(
+      technologyIds,
+      email,
+      req.googleToken!,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Technologies reordered successfully");

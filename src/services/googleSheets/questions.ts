@@ -27,29 +27,35 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
-
 /**
  * Extract priority from question text and return clean question with priority
  */
-const extractPriority = (questionText: string): { question: string; priority: "low" | "medium" | "high" } => {
+const extractPriority = (
+  questionText: string,
+): { question: string; priority: "low" | "medium" | "high" } => {
   const priorityRegex = /\|PRIORITY:(low|medium|high)\|$/;
   const match = questionText.match(priorityRegex);
-  
+
   if (match) {
     const priority = match[1] as "low" | "medium" | "high";
     const cleanQuestion = questionText.replace(priorityRegex, "").trim();
     return { question: cleanQuestion, priority };
   }
-  
+
   return { question: questionText, priority: "low" };
 };
 
 /**
  * Append priority metadata to question text
  */
-const appendPriority = (questionText: string, priority: "low" | "medium" | "high" = "low"): string => {
+const appendPriority = (
+  questionText: string,
+  priority: "low" | "medium" | "high" = "low",
+): string => {
   // Remove existing priority if any
-  const cleanQuestion = questionText.replace(/\|PRIORITY:(low|medium|high)\|$/, "").trim();
+  const cleanQuestion = questionText
+    .replace(/\|PRIORITY:(low|medium|high)\|$/, "")
+    .trim();
   return `${cleanQuestion}|PRIORITY:${priority}|`;
 };
 
@@ -81,7 +87,10 @@ export const getQuestions = async (
   limit?: number,
   email: string | null = null,
 ): Promise<Question[] | PaginatedResponse<Question>> => {
-  const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+  const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+    email,
+    accessToken,
+  );
   await ensureQuestionBankHeaders(technologyName, spreadsheetId, accessToken);
 
   try {
@@ -159,7 +168,7 @@ const buildQuestionRowData = (
   // Append priority to question text for storage
   const questionWithPriority = appendPriority(
     questionData.question || "",
-    questionData.priority || "low"
+    questionData.priority || "low",
   );
   const questionChunks = splitTextIntoChunks(questionWithPriority);
   const answerChunks = splitTextIntoChunks(questionData.answer || "");
@@ -192,7 +201,10 @@ export const addQuestion = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+      email,
+      accessToken,
+    );
     await ensureQuestionBankHeaders(technologyName, spreadsheetId, accessToken);
 
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
@@ -231,7 +243,10 @@ export const updateQuestion = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const actualRow = rowIndex + 2;
 
@@ -280,7 +295,10 @@ export const deleteQuestion = async (
   email: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const actualRow = rowIndex + 2;
 
@@ -304,7 +322,13 @@ export const deleteQuestion = async (
     });
 
     // Update serial numbers
-    const updatedQuestions = await getQuestions(technologyName, accessToken, undefined, undefined, email);
+    const updatedQuestions = await getQuestions(
+      technologyName,
+      accessToken,
+      undefined,
+      undefined,
+      email,
+    );
     const questionsArray = Array.isArray(updatedQuestions)
       ? updatedQuestions
       : updatedQuestions.data;
@@ -339,7 +363,10 @@ export const reorderQuestions = async (
       return true;
     }
 
-    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const oldRowNumber = oldIndex + 1;
     const newRowNumber = newIndex + 1;
@@ -366,7 +393,13 @@ export const reorderQuestions = async (
     });
 
     // Update serial numbers
-    const updatedQuestions = await getQuestions(technologyName, accessToken, undefined, undefined, email);
+    const updatedQuestions = await getQuestions(
+      technologyName,
+      accessToken,
+      undefined,
+      undefined,
+      email,
+    );
     const questionsArray = Array.isArray(updatedQuestions)
       ? updatedQuestions
       : updatedQuestions.data;

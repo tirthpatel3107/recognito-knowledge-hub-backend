@@ -86,12 +86,17 @@ export const addPracticalTaskHandler = asyncHandler(
     }
 
     try {
-      const success = await addPracticalTask(technologyName, {
-        question,
-        answer,
-        example,
-        priority: priority || "low",
-      }, email, googleToken);
+      const success = await addPracticalTask(
+        technologyName,
+        {
+          question,
+          answer,
+          example,
+          priority: priority || "low",
+        },
+        email,
+        googleToken,
+      );
 
       if (success) {
         return sendSuccess(res, null, "Practical task added successfully");
@@ -99,7 +104,8 @@ export const addPracticalTaskHandler = asyncHandler(
         return sendError(res, "Failed to add practical task", 500);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       console.error("Error in addPracticalTaskHandler:", error);
       return sendError(res, errorMessage, 500);
     }

@@ -29,7 +29,7 @@ export const getDashboardCardOrder = async (
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
-    
+
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
       range: "UserDetail!A2:F100",
@@ -48,7 +48,7 @@ export const getDashboardCardOrder = async (
             .split("\n")
             .map((id: string) => id.trim())
             .filter((id: string) => id !== "");
-          
+
           return cardIds;
         }
         break;
@@ -87,7 +87,10 @@ export const getDashboardCardOrder = async (
 
     return [];
   } catch (error) {
-    console.error(`[getDashboardCardOrder] Error getting dashboard card order for ${email}:`, error);
+    console.error(
+      `[getDashboardCardOrder] Error getting dashboard card order for ${email}:`,
+      error,
+    );
     if (error instanceof Error) {
       console.error(`[getDashboardCardOrder] Error message:`, error.message);
       console.error(`[getDashboardCardOrder] Error stack:`, error.stack);
@@ -107,7 +110,7 @@ export const saveDashboardCardOrder = async (
   try {
     const loginSpreadsheetId = getLoginSpreadsheetId();
     const sheetsClient = getSheetsClient(accessToken);
-    
+
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: loginSpreadsheetId,
       range: "UserDetail!A2:F100",
@@ -117,7 +120,9 @@ export const saveDashboardCardOrder = async (
     const rowIndex = findRowIndexByEmail(rows, email);
 
     if (rowIndex === -1) {
-      console.error(`[saveDashboardCardOrder] User not found in UserDetail: ${email}`);
+      console.error(
+        `[saveDashboardCardOrder] User not found in UserDetail: ${email}`,
+      );
       return false;
     }
 
@@ -140,9 +145,7 @@ export const saveDashboardCardOrder = async (
       error,
     );
     if (error instanceof Error) {
-      console.error(
-        `[saveDashboardCardOrder] Error message: ${error.message}`,
-      );
+      console.error(`[saveDashboardCardOrder] Error message: ${error.message}`);
       console.error(`[saveDashboardCardOrder] Error stack: ${error.stack}`);
     }
     return false;

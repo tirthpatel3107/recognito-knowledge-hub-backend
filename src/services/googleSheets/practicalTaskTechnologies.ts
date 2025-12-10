@@ -3,7 +3,11 @@
  * Handles practical task technology (sheet) CRUD operations
  */
 import type { Technology } from "../../types/googleSheets";
-import { getSheetsClient, ensureSheetHeaders, clearSpreadsheetMetadataCache } from "./utils";
+import {
+  getSheetsClient,
+  ensureSheetHeaders,
+  clearSpreadsheetMetadataCache,
+} from "./utils";
 import { getUserPracticalTasksSpreadsheetId } from "./userProfile";
 
 const PRACTICAL_TASK_HEADERS = ["No", "Question", "Answer", "Image"];
@@ -15,13 +19,12 @@ export const getPracticalTaskTechnologies = async (
   accessToken: string | null = null,
   email: string | null = null,
 ): Promise<Technology[]> => {
-  const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
-
-  const sheetsClient = getSheetsClient(
+  const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+    email,
     accessToken,
-    null,
-    spreadsheetId,
   );
+
+  const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
   const response = await sheetsClient.spreadsheets.get({
     spreadsheetId,
   });
@@ -43,12 +46,11 @@ export const createPracticalTaskTechnology = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
       accessToken,
-      null,
-      spreadsheetId,
     );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const response = await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: spreadsheetId,
       requestBody: {
@@ -97,12 +99,11 @@ export const updatePracticalTaskTechnology = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
       accessToken,
-      null,
-      spreadsheetId,
     );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: spreadsheetId,
       requestBody: {
@@ -134,12 +135,11 @@ export const deletePracticalTaskTechnology = async (
   accessToken: string | null = null,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
       accessToken,
-      null,
-      spreadsheetId,
     );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     // First, check how many sheets exist
     const spreadsheet = await sheetsClient.spreadsheets.get({
@@ -199,12 +199,11 @@ export const reorderPracticalTaskTechnologies = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(
+    const spreadsheetId = await getUserPracticalTasksSpreadsheetId(
+      email,
       accessToken,
-      null,
-      spreadsheetId,
     );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const requests = technologyIds.map((sheetId, index) => ({
       updateSheetProperties: {
         properties: {

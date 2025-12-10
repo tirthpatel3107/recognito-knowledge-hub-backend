@@ -11,7 +11,11 @@ const router = express.Router();
 router.get("/months", authenticateToken, workSummaryController.getMonthSheets);
 
 // Get work summary entries for a month (requires auth to get user-specific spreadsheet IDs from UserDetail)
-router.get("/entries/:monthSheet", authenticateToken, workSummaryController.getEntriesByMonth);
+router.get(
+  "/entries/:monthSheet",
+  authenticateToken,
+  workSummaryController.getEntriesByMonth,
+);
 
 // Create new month sheet (requires Google auth)
 router.post(

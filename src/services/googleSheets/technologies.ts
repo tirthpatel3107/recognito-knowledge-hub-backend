@@ -15,7 +15,10 @@ export const getTechnologies = async (
   accessToken: string | null = null,
   email: string | null = null,
 ): Promise<Technology[]> => {
-  const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+  const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+    email,
+    accessToken,
+  );
 
   const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
   const response = await sheetsClient.spreadsheets.get({
@@ -39,7 +42,10 @@ export const createTechnology = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const response = await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId,
@@ -86,7 +92,10 @@ export const updateTechnology = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId,
@@ -119,7 +128,10 @@ export const deleteTechnology = async (
   accessToken: string | null = null,
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     // First, check how many sheets exist
@@ -177,7 +189,10 @@ export const reorderTechnologies = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserQuestionBankSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserQuestionBankSpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const requests = technologyIds.map((sheetId, index) => ({
       updateSheetProperties: {

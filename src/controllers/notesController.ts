@@ -34,33 +34,23 @@ export const getTabs = asyncHandler(async (req: Request, res: Response) => {
     const tabs = await getTabsFromSheet(email, googleToken);
     return sendSuccess(res, tabs, "Tabs retrieved successfully");
   } catch (error: any) {
-    return sendError(
-      res,
-      error?.message || "Failed to retrieve tabs",
-      500,
-    );
+    return sendError(res, error?.message || "Failed to retrieve tabs", 500);
   }
 });
 
 /**
  * Get all notes from "All Notes" sheet
  */
-export const getAllNotes = asyncHandler(
-  async (req: Request, res: Response) => {
-    try {
-      const email = req.user?.email || null;
-      const googleToken = getGoogleTokenFromRequest(req);
-      const notes = await getAllNotesFromSheet(email, googleToken);
-      return sendSuccess(res, notes, "Notes retrieved successfully");
-    } catch (error: any) {
-      return sendError(
-        res,
-        error?.message || "Failed to retrieve notes",
-        500,
-      );
-    }
-  },
-);
+export const getAllNotes = asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const notes = await getAllNotesFromSheet(email, googleToken);
+    return sendSuccess(res, notes, "Notes retrieved successfully");
+  } catch (error: any) {
+    return sendError(res, error?.message || "Failed to retrieve notes", 500);
+  }
+});
 
 /**
  * Get notes for a specific tab
@@ -78,11 +68,7 @@ export const getNotes = asyncHandler(async (req: Request, res: Response) => {
     const notes = await getNotesByTab(tabName, email, googleToken);
     return sendSuccess(res, notes, "Notes retrieved successfully");
   } catch (error: any) {
-    return sendError(
-      res,
-      error?.message || "Failed to retrieve notes",
-      500,
-    );
+    return sendError(res, error?.message || "Failed to retrieve notes", 500);
   }
 });
 
@@ -119,38 +105,29 @@ export const getNotesByColumnForTab = asyncHandler(
 /**
  * Get headings for a specific tab
  */
-export const getHeadings = asyncHandler(
-  async (req: Request, res: Response) => {
-    const { tabName } = req.params;
+export const getHeadings = asyncHandler(async (req: Request, res: Response) => {
+  const { tabName } = req.params;
 
-    if (!tabName) {
-      return sendValidationError(res, "Tab name is required");
-    }
+  if (!tabName) {
+    return sendValidationError(res, "Tab name is required");
+  }
 
-    try {
-      const email = req.user?.email || null;
-      const googleToken = getGoogleTokenFromRequest(req);
-      const headings = await getTabHeadings(tabName, email, googleToken);
-      return sendSuccess(
-        res,
-        headings,
-        "Headings retrieved successfully",
-      );
-    } catch (error: any) {
-      return sendError(
-        res,
-        error?.message || "Failed to retrieve headings",
-        500,
-      );
-    }
-  },
-);
+  try {
+    const email = req.user?.email || null;
+    const googleToken = getGoogleTokenFromRequest(req);
+    const headings = await getTabHeadings(tabName, email, googleToken);
+    return sendSuccess(res, headings, "Headings retrieved successfully");
+  } catch (error: any) {
+    return sendError(res, error?.message || "Failed to retrieve headings", 500);
+  }
+});
 
 /**
  * Add a note to "All Notes" sheet
  */
 export const addNote = asyncHandler(async (req: Request, res: Response) => {
-  const { tabId, title, description, description2, description3, starred } = req.body;
+  const { tabId, title, description, description2, description3, starred } =
+    req.body;
 
   if (!tabId || !title) {
     return sendValidationError(res, "Tab ID and title are required");
@@ -178,11 +155,7 @@ export const addNote = asyncHandler(async (req: Request, res: Response) => {
       return sendError(res, "Failed to add note", 500);
     }
   } catch (error: any) {
-    return sendError(
-      res,
-      error?.message || "Failed to add note",
-      500,
-    );
+    return sendError(res, error?.message || "Failed to add note", 500);
   }
 });
 
@@ -228,57 +201,51 @@ export const updateNote = asyncHandler(async (req: Request, res: Response) => {
       return sendError(res, "Failed to update note", 500);
     }
   } catch (error: any) {
-    return sendError(
-      res,
-      error?.message || "Failed to update note",
-      500,
-    );
+    return sendError(res, error?.message || "Failed to update note", 500);
   }
 });
 
 /**
  * Update note tag (ID in column A) in "All Notes" sheet
  */
-export const updateNoteTagHandler = asyncHandler(async (req: Request, res: Response) => {
-  const { rowIndex } = req.params;
-  const { newTabId } = req.body;
+export const updateNoteTagHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { rowIndex } = req.params;
+    const { newTabId } = req.body;
 
-  if (!rowIndex) {
-    return sendValidationError(res, "Row index is required");
-  }
-
-  const rowIndexNum = parseInt(rowIndex, 10);
-  if (isNaN(rowIndexNum)) {
-    return sendValidationError(res, "Row index must be a valid number");
-  }
-
-  if (!newTabId || typeof newTabId !== "string" || newTabId.trim() === "") {
-    return sendValidationError(res, "New tab ID is required");
-  }
-
-  try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const success = await updateNoteTag(
-      rowIndexNum,
-      newTabId.trim(),
-      email,
-      googleToken,
-    );
-
-    if (success) {
-      return sendSuccess(res, null, "Note tag updated successfully");
-    } else {
-      return sendError(res, "Failed to update note tag", 500);
+    if (!rowIndex) {
+      return sendValidationError(res, "Row index is required");
     }
-  } catch (error: any) {
-    return sendError(
-      res,
-      error?.message || "Failed to update note tag",
-      500,
-    );
-  }
-});
+
+    const rowIndexNum = parseInt(rowIndex, 10);
+    if (isNaN(rowIndexNum)) {
+      return sendValidationError(res, "Row index must be a valid number");
+    }
+
+    if (!newTabId || typeof newTabId !== "string" || newTabId.trim() === "") {
+      return sendValidationError(res, "New tab ID is required");
+    }
+
+    try {
+      const email = req.user?.email || null;
+      const googleToken = getGoogleTokenFromRequest(req);
+      const success = await updateNoteTag(
+        rowIndexNum,
+        newTabId.trim(),
+        email,
+        googleToken,
+      );
+
+      if (success) {
+        return sendSuccess(res, null, "Note tag updated successfully");
+      } else {
+        return sendError(res, "Failed to update note tag", 500);
+      }
+    } catch (error: any) {
+      return sendError(res, error?.message || "Failed to update note tag", 500);
+    }
+  },
+);
 
 /**
  * Delete a note from "All Notes" sheet
@@ -310,11 +277,6 @@ export const deleteNote = asyncHandler(async (req: Request, res: Response) => {
       return sendError(res, "Failed to delete note", 500);
     }
   } catch (error: any) {
-    return sendError(
-      res,
-      error?.message || "Failed to delete note",
-      500,
-    );
+    return sendError(res, error?.message || "Failed to delete note", 500);
   }
 });
-

@@ -13,7 +13,11 @@ import {
 const router = express.Router();
 
 // Get questions for a technology (requires auth to get user-specific spreadsheet IDs from UserDetail)
-router.get("/:technologyName", authenticateToken, questionsController.getQuestionsByTechnology);
+router.get(
+  "/:technologyName",
+  authenticateToken,
+  questionsController.getQuestionsByTechnology,
+);
 
 // Add question (requires Google auth)
 router.post(

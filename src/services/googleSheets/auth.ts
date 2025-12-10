@@ -94,7 +94,8 @@ export const authenticateUser = async (
 
     return {
       success: false,
-      error: "Failed to authenticate. Please check your credentials and try again.",
+      error:
+        "Failed to authenticate. Please check your credentials and try again.",
     };
   }
 };

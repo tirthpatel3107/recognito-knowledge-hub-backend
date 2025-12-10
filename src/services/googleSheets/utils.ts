@@ -43,9 +43,10 @@ export const initializeGoogleSheets = (): void => {
  */
 export const initializeServiceAccount = (serviceAccountKey: string): void => {
   try {
-    const key = typeof serviceAccountKey === "string"
-      ? JSON.parse(serviceAccountKey)
-      : serviceAccountKey;
+    const key =
+      typeof serviceAccountKey === "string"
+        ? JSON.parse(serviceAccountKey)
+        : serviceAccountKey;
 
     serviceAccountClient = new google.auth.JWT({
       email: key.client_email,
@@ -95,7 +96,7 @@ export const getCurrentAccessToken = (): string | null => {
  * Get Google Sheets client
  * For login sheet: uses user's OAuth token (they need access to login sheet)
  * For all other sheets: uses service account (which has access to all sheets)
- * 
+ *
  * @param accessToken - User's OAuth token (required for login sheet operations)
  * @param useServiceAccount - Force use of service account (default: auto-detect based on spreadsheet)
  * @param spreadsheetId - Optional spreadsheet ID to determine which auth to use
@@ -577,17 +578,20 @@ export const findSheetByName = async (
         const normalized = normalizeString(title);
         return normalized === normalizedTarget;
       });
-
     }
 
     // Strategy 3: Partial match (contains all words)
     if (!foundSheet) {
-      const targetWords = normalizedTarget.split(/\s+/).filter(w => w.length > 0);
+      const targetWords = normalizedTarget
+        .split(/\s+/)
+        .filter((w) => w.length > 0);
       foundSheet = sheetsList.find((sheet: any) => {
         const title = normalizeString(sheet.properties?.title || "");
-        return targetWords.length > 0 && targetWords.every((word) => title.includes(word));
+        return (
+          targetWords.length > 0 &&
+          targetWords.every((word) => title.includes(word))
+        );
       });
-      
     }
 
     // Strategy 4: Starts with match (for cases where sheet name might have suffix)
@@ -596,7 +600,6 @@ export const findSheetByName = async (
         const title = normalizeString(sheet.properties?.title || "");
         return title.startsWith(normalizedTarget);
       });
-      
     }
 
     if (!foundSheet) {
@@ -608,7 +611,10 @@ export const findSheetByName = async (
     }
 
     // Check if sheetId exists (using !== undefined to handle 0 as valid)
-    if (foundSheet.properties?.sheetId === undefined || foundSheet.properties?.sheetId === null) {
+    if (
+      foundSheet.properties?.sheetId === undefined ||
+      foundSheet.properties?.sheetId === null
+    ) {
       return { sheetName: foundSheet.properties.title, availableSheets };
     }
     return {

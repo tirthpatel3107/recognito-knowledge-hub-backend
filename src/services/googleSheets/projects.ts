@@ -38,7 +38,10 @@ export const getProjects = async (
 ): Promise<Project[]> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail tab
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
+      accessToken,
+    );
 
     // Check if service account is initialized (required for WORK_SUMMARY spreadsheet)
     if (!isServiceAccountInitialized()) {
@@ -50,11 +53,7 @@ export const getProjects = async (
       );
     }
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const sheetName = await getProjectListSheetName(spreadsheetId, accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -70,17 +69,21 @@ export const getProjects = async (
     }));
   } catch (error: any) {
     console.error("Error getting projects:", error);
-    
+
     // Provide more specific error messages for common issues
     if (error?.response?.status === 404) {
-      const errorMessage = error?.response?.data?.error?.message || error?.message || "";
-      if (errorMessage.includes("spreadsheet") || errorMessage.includes("404")) {
+      const errorMessage =
+        error?.response?.data?.error?.message || error?.message || "";
+      if (
+        errorMessage.includes("spreadsheet") ||
+        errorMessage.includes("404")
+      ) {
         throw new Error(
           `Work Summary spreadsheet not found. Please verify that WORK_SUMMARY_SPREADSHEET_ID is set in the UserDetail tab (column J) for your user and the service account has access to it.`,
         );
       }
     }
-    
+
     // Re-throw the error so the API can return a proper error response
     throw error;
   }
@@ -95,12 +98,11 @@ export const addProject = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
       accessToken,
-      null,
-      spreadsheetId,
     );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const sheetName = await getProjectListSheetName(spreadsheetId, accessToken);
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -133,12 +135,11 @@ export const updateProject = async (
   oldProjectName?: string,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
       accessToken,
-      null,
-      spreadsheetId,
     );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const sheetName = await getProjectListSheetName(spreadsheetId, accessToken);
     const actualRow = rowIndex + 2;
 
@@ -187,12 +188,11 @@ export const deleteProject = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
       accessToken,
-      null,
-      spreadsheetId,
     );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const actualRow = rowIndex + 2;
 
     await sheetsClient.spreadsheets.batchUpdate({
@@ -229,12 +229,11 @@ export const reorderProjects = async (
   accessToken: string | null = null,
 ): Promise<boolean> => {
   try {
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
-    const sheetsClient = getSheetsClient(
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
       accessToken,
-      null,
-      spreadsheetId,
     );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
     const actualOldRow = oldIndex + 2;
     const actualNewRow = newIndex + 2;
 

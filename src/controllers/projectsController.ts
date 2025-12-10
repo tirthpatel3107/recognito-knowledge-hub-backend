@@ -30,9 +30,14 @@ const getProjectListSheetId = async (
   accessToken: string | null = null,
 ): Promise<{ sheetId?: number; availableSheets?: string[] }> => {
   try {
-    const { getUserWorkSummarySpreadsheetId } = await import("../services/googleSheets/userProfile");
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
-    
+    const { getUserWorkSummarySpreadsheetId } = await import(
+      "../services/googleSheets/userProfile"
+    );
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
+      accessToken,
+    );
+
     const result = await findSheetByName(
       spreadsheetId,
       "Project List",
@@ -80,7 +85,11 @@ export const addProjectHandler = asyncHandler(
       );
     }
 
-    const success = await addProject({ project, projectId }, email, googleToken);
+    const success = await addProject(
+      { project, projectId },
+      email,
+      googleToken,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Project added successfully");
@@ -136,12 +145,15 @@ export const deleteProjectHandler = asyncHandler(
     const { rowIndex } = req.params;
 
     if (!rowIndex || isNaN(parseInt(rowIndex))) {
-      return sendValidationError(res, `Invalid rowIndex parameter: ${rowIndex}. Must be a number.`);
+      return sendValidationError(
+        res,
+        `Invalid rowIndex parameter: ${rowIndex}. Must be a number.`,
+      );
     }
 
     const email = req.user?.email || null;
     const googleToken = getGoogleTokenFromRequest(req);
-    
+
     const result = await getProjectListSheetId(email, googleToken);
 
     // Check if sheetId exists (using !== undefined to handle 0 as valid sheetId)
@@ -154,8 +166,13 @@ export const deleteProjectHandler = asyncHandler(
     }
 
     const parsedRowIndex = parseInt(rowIndex);
-    
-    const success = await deleteProject(parsedRowIndex, result.sheetId, email, googleToken);
+
+    const success = await deleteProject(
+      parsedRowIndex,
+      result.sheetId,
+      email,
+      googleToken,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Project deleted successfully");
@@ -198,7 +215,13 @@ export const reorderProjectsHandler = asyncHandler(
       );
     }
 
-    const success = await reorderProjects(oldIndex, newIndex, result.sheetId, email, googleToken);
+    const success = await reorderProjects(
+      oldIndex,
+      newIndex,
+      result.sheetId,
+      email,
+      googleToken,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Projects reordered successfully");

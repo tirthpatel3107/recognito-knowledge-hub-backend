@@ -94,7 +94,11 @@ export const loadConfigFromSheet = async (
             }
             const normalizedKey = rawKey.trim().toUpperCase();
             // Skip spreadsheet ID keys
-            if (excludedKeys.some(key => normalizedKey === key || normalizedKey.includes(key))) {
+            if (
+              excludedKeys.some(
+                (key) => normalizedKey === key || normalizedKey.includes(key),
+              )
+            ) {
               continue;
             }
             configMap[rawKey.trim()] = (rawValue ?? "").trim();
@@ -140,13 +144,13 @@ export const loadConfigFromSheet = async (
                 // "PROJECT_LISTING_SPREADSHEET_ID": "PROJECT_LISTING_SPREADSHEET_ID",
                 // "NOTES_SPREADSHEET_ID": "NOTES_SPREADSHEET_ID",
                 // "TAGS_SPREADSHEET_ID": "TAGS_SPREADSHEET_ID",
-                "GOOGLE_API_KEY": "GOOGLE_API_KEY",
-                "GOOGLE_CLIENT_ID": "GOOGLE_CLIENT_ID",
-                "CLIENT_ID": "GOOGLE_CLIENT_ID",
-                "GOOGLE_CLIENT_SECRET": "GOOGLE_CLIENT_SECRET",
-                "CLIENT_SECRET": "GOOGLE_CLIENT_SECRET",
-                "SERVICE_ACCOUNT_KEY": "SERVICE_ACCOUNT_KEY",
-                "JWT_SECRET": "JWT_SECRET",
+                GOOGLE_API_KEY: "GOOGLE_API_KEY",
+                GOOGLE_CLIENT_ID: "GOOGLE_CLIENT_ID",
+                CLIENT_ID: "GOOGLE_CLIENT_ID",
+                GOOGLE_CLIENT_SECRET: "GOOGLE_CLIENT_SECRET",
+                CLIENT_SECRET: "GOOGLE_CLIENT_SECRET",
+                SERVICE_ACCOUNT_KEY: "SERVICE_ACCOUNT_KEY",
+                JWT_SECRET: "JWT_SECRET",
               };
 
               // Check for exact match first
@@ -169,16 +173,32 @@ export const loadConfigFromSheet = async (
                 //   headerIndices["NOTES_SPREADSHEET_ID"] = index;
                 // } else if (normalizedHeader.includes("TAGS") && normalizedHeader.includes("SPREADSHEET") && !headerIndices["TAGS_SPREADSHEET_ID"]) {
                 //   headerIndices["TAGS_SPREADSHEET_ID"] = index;
-                // } else 
-                if (normalizedHeader.includes("GOOGLE_API_KEY") && !headerIndices["GOOGLE_API_KEY"]) {
+                // } else
+                if (
+                  normalizedHeader.includes("GOOGLE_API_KEY") &&
+                  !headerIndices["GOOGLE_API_KEY"]
+                ) {
                   headerIndices["GOOGLE_API_KEY"] = index;
-                } else if (normalizedHeader.includes("CLIENT_ID") && !normalizedHeader.includes("SECRET") && !headerIndices["GOOGLE_CLIENT_ID"]) {
+                } else if (
+                  normalizedHeader.includes("CLIENT_ID") &&
+                  !normalizedHeader.includes("SECRET") &&
+                  !headerIndices["GOOGLE_CLIENT_ID"]
+                ) {
                   headerIndices["GOOGLE_CLIENT_ID"] = index;
-                } else if (normalizedHeader.includes("CLIENT_SECRET") && !headerIndices["GOOGLE_CLIENT_SECRET"]) {
+                } else if (
+                  normalizedHeader.includes("CLIENT_SECRET") &&
+                  !headerIndices["GOOGLE_CLIENT_SECRET"]
+                ) {
                   headerIndices["GOOGLE_CLIENT_SECRET"] = index;
-                } else if (normalizedHeader.includes("SERVICE_ACCOUNT") && !headerIndices["SERVICE_ACCOUNT_KEY"]) {
+                } else if (
+                  normalizedHeader.includes("SERVICE_ACCOUNT") &&
+                  !headerIndices["SERVICE_ACCOUNT_KEY"]
+                ) {
                   headerIndices["SERVICE_ACCOUNT_KEY"] = index;
-                } else if (normalizedHeader.includes("JWT_SECRET") && !headerIndices["JWT_SECRET"]) {
+                } else if (
+                  normalizedHeader.includes("JWT_SECRET") &&
+                  !headerIndices["JWT_SECRET"]
+                ) {
                   headerIndices["JWT_SECRET"] = index;
                 }
               }

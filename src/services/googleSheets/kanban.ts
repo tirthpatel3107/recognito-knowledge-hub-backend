@@ -2,11 +2,7 @@
  * Google Sheets Kanban Board Service
  * Handles kanban board task CRUD operations
  */
-import {
-  getSheetsClient,
-  ensureSheetHeaders,
-  findSheetByName,
-} from "./utils";
+import { getSheetsClient, ensureSheetHeaders, findSheetByName } from "./utils";
 import { getUserKanbanBoardSpreadsheetId } from "./userProfile";
 
 const KANBAN_SHEET_NAME = "Board";
@@ -72,7 +68,10 @@ export const getKanbanTasks = async (
 ): Promise<Record<string, KanbanTask[]>> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail sheet
-    const spreadsheetId = await getUserKanbanBoardSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserKanbanBoardSpreadsheetId(
+      email,
+      accessToken,
+    );
 
     await ensureKanbanSheet(spreadsheetId, accessToken);
 
@@ -84,11 +83,7 @@ export const getKanbanTasks = async (
     );
     const actualSheetName = sheetInfo.sheetName || KANBAN_SHEET_NAME;
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -154,7 +149,10 @@ export const saveKanbanTasks = async (
 ): Promise<boolean> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail sheet
-    const spreadsheetId = await getUserKanbanBoardSpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserKanbanBoardSpreadsheetId(
+      email,
+      accessToken,
+    );
 
     await ensureKanbanSheet(spreadsheetId, accessToken);
 
@@ -166,11 +164,7 @@ export const saveKanbanTasks = async (
     );
     const actualSheetName = sheetInfo.sheetName || KANBAN_SHEET_NAME;
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     // Prepare data for Google Sheets
     const values = tasks.map((task) => [
@@ -206,4 +200,3 @@ export const saveKanbanTasks = async (
     throw error;
   }
 };
-

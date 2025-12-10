@@ -71,12 +71,17 @@ export const addQuestionHandler = asyncHandler(
       return sendValidationError(res, "Question and answer are required");
     }
 
-    const success = await addQuestion(technologyName, {
-      question,
-      answer,
-      example,
-      priority: priority || "low",
-    }, email, req.googleToken!);
+    const success = await addQuestion(
+      technologyName,
+      {
+        question,
+        answer,
+        example,
+        priority: priority || "low",
+      },
+      email,
+      req.googleToken!,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Question added successfully");
@@ -100,12 +105,18 @@ export const updateQuestionHandler = asyncHandler(
       return sendValidationError(res, "Question and answer are required");
     }
 
-    const success = await updateQuestion(technologyName, parseInt(rowIndex), {
-      question,
-      answer,
-      example,
-      priority: priority || "low",
-    }, email, req.googleToken!);
+    const success = await updateQuestion(
+      technologyName,
+      parseInt(rowIndex),
+      {
+        question,
+        answer,
+        example,
+        priority: priority || "low",
+      },
+      email,
+      req.googleToken!,
+    );
 
     if (success) {
       return sendSuccess(res, null, "Question updated successfully");
@@ -140,11 +151,7 @@ export const deleteQuestionHandler = asyncHandler(
     );
 
     if (success) {
-      return sendSuccess(
-        res,
-        null,
-        "Question deleted successfully",
-      );
+      return sendSuccess(res, null, "Question deleted successfully");
     } else {
       return sendError(res, "Failed to delete question", 500);
     }

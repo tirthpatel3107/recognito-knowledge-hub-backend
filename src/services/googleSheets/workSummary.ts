@@ -48,7 +48,10 @@ export const getWorkSummaryMonthSheets = async (
 ): Promise<string[]> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail tab
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
+      accessToken,
+    );
 
     // Check if service account is initialized (required for WORK_SUMMARY spreadsheet)
     if (!isServiceAccountInitialized()) {
@@ -75,17 +78,21 @@ export const getWorkSummaryMonthSheets = async (
       });
   } catch (error: any) {
     console.error("Error getting work summary month sheets:", error);
-    
+
     // Provide more specific error messages for common issues
     if (error?.response?.status === 404) {
-      const errorMessage = error?.response?.data?.error?.message || error?.message || "";
-      if (errorMessage.includes("spreadsheet") || errorMessage.includes("404")) {
+      const errorMessage =
+        error?.response?.data?.error?.message || error?.message || "";
+      if (
+        errorMessage.includes("spreadsheet") ||
+        errorMessage.includes("404")
+      ) {
         throw new Error(
           `Work Summary spreadsheet not found. Please verify that WORK_SUMMARY_SPREADSHEET_ID is set in the UserDetail tab (column J) for your user and the service account has access to it.`,
         );
       }
     }
-    
+
     // Re-throw the error so the API can return a proper error response
     throw error;
   }
@@ -100,10 +107,7 @@ const reorderWorkSummarySheets = async (
 ): Promise<boolean> => {
   try {
     const sheetsClient = getSheetsClient(accessToken);
-    const sheets = await getSpreadsheetMetadata(
-      spreadsheetId,
-      accessToken,
-    );
+    const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
 
     // Categorize sheets
     const projectListSheet = sheets.find((sheet: any) => {
@@ -191,8 +195,11 @@ export const createWorkSummaryMonthSheet = async (
 ): Promise<boolean> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail tab
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
-    
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
+      accessToken,
+    );
+
     const sheetsClient = getSheetsClient(accessToken);
     const response = await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: spreadsheetId,
@@ -237,7 +244,10 @@ export const getWorkSummaryEntriesByMonth = async (
   accessToken: string | null = null,
 ): Promise<WorkSummaryEntry[]> => {
   // Get user-specific spreadsheet ID from UserDetail tab
-  const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+  const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+    email,
+    accessToken,
+  );
   await ensureWorkSummaryHeaders(monthSheet, spreadsheetId, accessToken);
 
   try {
@@ -270,17 +280,21 @@ export const getWorkSummaryEntriesByMonth = async (
       `Error getting work summary entries for month ${monthSheet}:`,
       error,
     );
-    
+
     // Provide more specific error messages for common issues
     if (error?.response?.status === 404) {
-      const errorMessage = error?.response?.data?.error?.message || error?.message || "";
-      if (errorMessage.includes("spreadsheet") || errorMessage.includes("404")) {
+      const errorMessage =
+        error?.response?.data?.error?.message || error?.message || "";
+      if (
+        errorMessage.includes("spreadsheet") ||
+        errorMessage.includes("404")
+      ) {
         throw new Error(
           `Work Summary spreadsheet not found. Please verify that WORK_SUMMARY_SPREADSHEET_ID is set in the UserDetail tab (column J) for your user and the service account has access to it.`,
         );
       }
     }
-    
+
     // Re-throw the error so the API can return a proper error response
     throw error;
   }
@@ -297,7 +311,10 @@ export const addWorkSummaryEntry = async (
 ): Promise<boolean> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail tab
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
+      accessToken,
+    );
     await ensureWorkSummaryHeaders(monthSheet, spreadsheetId, accessToken);
 
     const sheetsClient = getSheetsClient(accessToken);
@@ -445,7 +462,10 @@ export const updateWorkSummaryEntry = async (
 ): Promise<boolean> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail tab
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken);
     const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
     const targetSheet = sheets.find(
@@ -519,7 +539,10 @@ export const deleteWorkSummaryEntry = async (
 ): Promise<boolean> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail tab
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
+      accessToken,
+    );
     const sheetsClient = getSheetsClient(accessToken);
     const actualRow = rowIndex + 2;
 
@@ -557,7 +580,10 @@ export const updateProjectNameInWorkSummary = async (
 ): Promise<boolean> => {
   try {
     // Get user-specific spreadsheet ID from UserDetail tab
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(email, accessToken);
+    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
+      email,
+      accessToken,
+    );
 
     // Check if service account is initialized
     if (!isServiceAccountInitialized()) {
@@ -579,7 +605,11 @@ export const updateProjectNameInWorkSummary = async (
     // Iterate through each month sheet
     for (const monthSheet of monthSheets) {
       // Get all entries from this sheet
-      const entries = await getWorkSummaryEntriesByMonth(monthSheet, email, accessToken);
+      const entries = await getWorkSummaryEntriesByMonth(
+        monthSheet,
+        email,
+        accessToken,
+      );
 
       // Find entries with matching project name
       for (let i = 0; i < entries.length; i++) {

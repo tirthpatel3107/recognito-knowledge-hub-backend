@@ -13,7 +13,14 @@ import { getUserNotesSpreadsheetId } from "./userProfile";
 const TABS_SHEET_NAME = "Tabs";
 const ALL_NOTES_SHEET_NAME = "All Notes";
 const TABS_HEADERS = ["ID", "Tab Name", "Pinned"];
-const ALL_NOTES_HEADERS = ["ID", "Title", "Description1", "Description2", "Description3", "Starred"];
+const ALL_NOTES_HEADERS = [
+  "ID",
+  "Title",
+  "Description1",
+  "Description2",
+  "Description3",
+  "Starred",
+];
 
 export interface NotesTab {
   id: string;
@@ -92,11 +99,7 @@ export const getTabsFromSheet = async (
 
     await ensureTabsSheet(spreadsheetId, accessToken);
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -113,12 +116,15 @@ export const getTabsFromSheet = async (
       if (row.length >= 2) {
         const tabId = row[0]?.toString().trim() || "";
         const tabName = row[1]?.toString().trim() || "";
-        const pinned = row[2]?.toString().trim().toLowerCase() === "true" || row[2]?.toString().trim() === "1";
+        const pinned =
+          row[2]?.toString().trim().toLowerCase() === "true" ||
+          row[2]?.toString().trim() === "1";
 
         if (tabId && tabName) {
           // Find sheetId for this tab
           const sheet = sheets.find(
-            (s: any) => s.properties?.title?.toLowerCase() === tabName.toLowerCase(),
+            (s: any) =>
+              s.properties?.title?.toLowerCase() === tabName.toLowerCase(),
           );
 
           tabs.push({
@@ -149,11 +155,7 @@ export const getAllNotesFromSheet = async (
 
     await ensureAllNotesSheet(spreadsheetId, accessToken);
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -174,7 +176,9 @@ export const getAllNotesFromSheet = async (
       const description = row[2]?.toString().trim() || "";
       const description2 = row[3]?.toString().trim() || "";
       const description3 = row[4]?.toString().trim() || "";
-      const starred = row[5]?.toString().trim().toLowerCase() === "true" || row[5]?.toString().trim() === "1";
+      const starred =
+        row[5]?.toString().trim().toLowerCase() === "true" ||
+        row[5]?.toString().trim() === "1";
 
       if (id && title) {
         notes.push({
@@ -211,11 +215,7 @@ export const getNotesByTab = async (
   try {
     const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     const response = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -294,11 +294,7 @@ export const getTabHeadings = async (
   try {
     const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     const headingsResponse = await sheetsClient.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
@@ -322,11 +318,7 @@ export const getNotesByColumn = async (
   try {
     const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
 
-    const sheetsClient = getSheetsClient(
-      accessToken,
-      null,
-      spreadsheetId,
-    );
+    const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
 
     // Get row 1 to find all columns with headings
     const headingsResponse = await sheetsClient.spreadsheets.values.get({
@@ -378,25 +370,29 @@ export const addNoteToAllNotes = async (
   try {
     const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
     await ensureAllNotesSheet(spreadsheetId, accessToken);
-    
+
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
-    
+
     // Get existing notes to find the next row
     const existingNotes = await getAllNotesFromSheet(email, accessToken);
-    const nextRow = existingNotes.length > 0 
-      ? Math.max(...existingNotes.map((n) => n.rowIndex)) + 3 
-      : 2; // First note goes in row 2 (row 1 = header)
-    
+    const nextRow =
+      existingNotes.length > 0
+        ? Math.max(...existingNotes.map((n) => n.rowIndex)) + 3
+        : 2; // First note goes in row 2 (row 1 = header)
+
     // Prepare values: [ID, Title, Description1, Description2, Description3, Starred]
-    const starredValue = noteData.starred !== undefined ? noteData.starred : false;
-    const values = [[
-      noteData.tabId || "",
-      noteData.title || "",
-      noteData.description || "",
-      noteData.description2 || "",
-      noteData.description3 || "",
-      starredValue ? "true" : "false",
-    ]];
+    const starredValue =
+      noteData.starred !== undefined ? noteData.starred : false;
+    const values = [
+      [
+        noteData.tabId || "",
+        noteData.title || "",
+        noteData.description || "",
+        noteData.description2 || "",
+        noteData.description3 || "",
+        starredValue ? "true" : "false",
+      ],
+    ];
 
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: spreadsheetId,
@@ -406,7 +402,7 @@ export const addNoteToAllNotes = async (
         values: values,
       },
     });
-    
+
     return true;
   } catch (error) {
     console.error("Error adding note to All Notes:", error);
@@ -425,26 +421,28 @@ export const deleteNoteFromAllNotes = async (
   try {
     const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
     await ensureAllNotesSheet(spreadsheetId, accessToken);
-    
+
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
-    
+
     // Get the sheet ID for "All Notes" sheet
     const sheets = await getSpreadsheetMetadata(spreadsheetId, accessToken);
     const allNotesSheet = sheets.find(
-      (sheet: any) => sheet.properties?.title?.toLowerCase() === ALL_NOTES_SHEET_NAME.toLowerCase(),
+      (sheet: any) =>
+        sheet.properties?.title?.toLowerCase() ===
+        ALL_NOTES_SHEET_NAME.toLowerCase(),
     );
-    
+
     if (!allNotesSheet?.properties?.sheetId) {
       console.error("Could not find 'All Notes' sheet");
       return false;
     }
-    
+
     const sheetId = allNotesSheet.properties.sheetId;
-    
+
     // rowIndex is 0-based (row 2 = index 0), so actual row = rowIndex + 2
     // For deleteDimension, we need 0-based index, so rowIndex + 1 (row 2 = index 1)
     const actualRow = rowIndex + 2;
-    
+
     await sheetsClient.spreadsheets.batchUpdate({
       spreadsheetId: spreadsheetId,
       requestBody: {
@@ -462,7 +460,7 @@ export const deleteNoteFromAllNotes = async (
         ],
       },
     });
-    
+
     return true;
   } catch (error) {
     console.error("Error deleting note from All Notes:", error);
@@ -488,19 +486,22 @@ export const updateNoteInAllNotes = async (
   try {
     const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
-    
+
     // rowIndex is 0-based (row 2 = index 0), so actual row = rowIndex + 2
     const actualRow = rowIndex + 2;
-    
+
     // Update columns B (Title), C (Description1), D (Description2), E (Description3), F (Starred)
-    const starredValue = noteData.starred !== undefined ? noteData.starred : false;
-    const values = [[
-      noteData.title || "",
-      noteData.description || "",
-      noteData.description2 || "",
-      noteData.description3 || "",
-      starredValue ? "true" : "false",
-    ]];
+    const starredValue =
+      noteData.starred !== undefined ? noteData.starred : false;
+    const values = [
+      [
+        noteData.title || "",
+        noteData.description || "",
+        noteData.description2 || "",
+        noteData.description3 || "",
+        starredValue ? "true" : "false",
+      ],
+    ];
 
     await sheetsClient.spreadsheets.values.update({
       spreadsheetId: spreadsheetId,
@@ -510,7 +511,7 @@ export const updateNoteInAllNotes = async (
         values: values,
       },
     });
-    
+
     return true;
   } catch (error) {
     console.error("Error updating note in All Notes:", error);
@@ -530,10 +531,10 @@ export const updateNoteTag = async (
   try {
     const spreadsheetId = await getUserNotesSpreadsheetId(email, accessToken);
     const sheetsClient = getSheetsClient(accessToken, null, spreadsheetId);
-    
+
     // rowIndex is 0-based (row 2 = index 0), so actual row = rowIndex + 2
     const actualRow = rowIndex + 2;
-    
+
     // Update column A (ID/Tag)
     const values = [[newTabId]];
 
@@ -545,11 +546,10 @@ export const updateNoteTag = async (
         values: values,
       },
     });
-    
+
     return true;
   } catch (error) {
     console.error("Error updating note tag:", error);
     return false;
   }
 };
-
