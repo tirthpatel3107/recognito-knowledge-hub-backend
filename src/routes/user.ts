@@ -2,7 +2,7 @@
  * User Preferences Routes
  */
 import express from "express";
-import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import { authenticateToken } from "../middleware/auth";
 import * as userController from "../controllers/userController";
 
 const router = express.Router();
@@ -18,7 +18,6 @@ router.get(
 router.post(
   "/dashboard-order",
   authenticateToken,
-  authenticateGoogleToken,
   userController.saveDashboardCardOrderHandler,
 );
 
@@ -29,7 +28,6 @@ router.get("/profile", authenticateToken, userController.getUserProfileHandler);
 router.post(
   "/profile",
   authenticateToken,
-  authenticateGoogleToken,
   userController.updateUserProfileHandler,
 );
 
@@ -37,7 +35,6 @@ router.post(
 router.post(
   "/password",
   authenticateToken,
-  authenticateGoogleToken,
   userController.updateUserPasswordHandler,
 );
 
@@ -52,7 +49,6 @@ router.get(
 router.post(
   "/color-palette",
   authenticateToken,
-  authenticateGoogleToken,
   userController.updateUserColorPaletteHandler,
 );
 

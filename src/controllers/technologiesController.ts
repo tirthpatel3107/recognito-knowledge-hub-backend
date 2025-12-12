@@ -9,53 +9,21 @@ import {
   updateTechnology,
   deleteTechnology,
   reorderTechnologies,
-  setUserCredentials,
-  authenticateUser,
-} from "../services/googleSheets";
+} from "../services/mongodb/technologies";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
   sendError,
   sendValidationError,
-  sendNotFound,
 } from "../utils/responseHelper";
-import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 /**
  * Get all technologies
  */
 export const getAllTechnologies = asyncHandler(
   async (req: Request, res: Response) => {
-    try {
-      const email = req.user?.email || null;
-      const googleToken = getGoogleTokenFromRequest(req);
-      const technologies = await getTechnologies(googleToken, email);
-      return sendSuccess(res, technologies);
-    } catch (error: any) {
-      // Provide more helpful error messages
-      if (
-        error.message &&
-        error.message.includes("QUESTION_BANK_SPREADSHEET_ID is not configured")
-      ) {
-        return sendError(
-          res,
-          "Configuration not loaded. Please authenticate first to load configuration from Google Sheets.",
-          503,
-        );
-      }
-      if (
-        error.message &&
-        error.message.includes("Google API key is not configured")
-      ) {
-        return sendError(
-          res,
-          "Google API key is not configured. Please authenticate to load configuration.",
-          503,
-        );
-      }
-      // Re-throw to let asyncHandler handle it
-      throw error;
-    }
+    const technologies = await getTechnologies();
+    return sendSuccess(res, technologies);
   },
 );
 
@@ -64,20 +32,18 @@ export const getAllTechnologies = asyncHandler(
  */
 export const createTechnologyHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
-    const email = req.user?.email || null;
     const { name } = req.body;
 
     if (!name) {
       return sendValidationError(res, "Technology name is required");
     }
 
-    const success = await createTechnology(name, email, req.googleToken!);
+    const result = await createTechnology(name);
 
-    if (success) {
+    if (result.success) {
       return sendSuccess(res, null, "Technology created successfully");
     } else {
-      return sendError(res, "Failed to create technology", 500);
+      return sendError(res, result.error || "Failed to create technology", 500);
     }
   },
 );
@@ -87,22 +53,14 @@ export const createTechnologyHandler = asyncHandler(
  */
 export const updateTechnologyHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
-    const email = req.user?.email || null;
     const { sheetId } = req.params;
-    const { oldName, newName } = req.body;
+    const { newName } = req.body;
 
-    if (!oldName || !newName) {
-      return sendValidationError(res, "Old name and new name are required");
+    if (!newName) {
+      return sendValidationError(res, "New name is required");
     }
 
-    const success = await updateTechnology(
-      oldName,
-      newName,
-      parseInt(sheetId),
-      email,
-      req.googleToken!,
-    );
+    const success = await updateTechnology(sheetId, newName);
 
     if (success) {
       return sendSuccess(res, null, "Technology updated successfully");
@@ -117,22 +75,9 @@ export const updateTechnologyHandler = asyncHandler(
  */
 export const deleteTechnologyHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    const email = req.user!.email;
-    const googleToken = getGoogleTokenFromRequest(req);
     const { sheetId } = req.params;
 
-    // Validate Google token is available
-    if (!googleToken) {
-      return sendError(res, "Google access token is required", 401);
-    }
-
-    // Set user credentials and proceed with deletion
-    setUserCredentials(googleToken);
-    const result = await deleteTechnology(
-      parseInt(sheetId),
-      email,
-      googleToken,
-    );
+    const result = await deleteTechnology(sheetId);
 
     if (result.success) {
       return sendSuccess(res, null, "Technology deleted successfully");
@@ -147,19 +92,13 @@ export const deleteTechnologyHandler = asyncHandler(
  */
 export const reorderTechnologiesHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
-    const email = req.user?.email || null;
     const { technologyIds } = req.body;
 
     if (!Array.isArray(technologyIds)) {
       return sendValidationError(res, "technologyIds must be an array");
     }
 
-    const success = await reorderTechnologies(
-      technologyIds,
-      email,
-      req.googleToken!,
-    );
+    const success = await reorderTechnologies(technologyIds);
 
     if (success) {
       return sendSuccess(res, null, "Technologies reordered successfully");

@@ -1,8 +1,13 @@
 node_modules/
 .env
+.env.local
+.env.*.local
 .DS_Store
 *.log
 dist/
 build/
 .vscode/
 .idea/
+
+# But allow .env.example files (they are safe to commit)
+!.env.example

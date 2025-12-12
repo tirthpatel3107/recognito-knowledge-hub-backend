@@ -2,7 +2,7 @@
  * Questions Routes
  */
 import express from "express";
-import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import { authenticateToken } from "../middleware/auth";
 import * as questionsController from "../controllers/questionsController";
 import { writeLimiter } from "../middleware/rateLimiter";
 import {
@@ -24,7 +24,6 @@ router.post(
   "/:technologyName",
   writeLimiter,
   authenticateToken,
-  authenticateGoogleToken,
   validateQuestion,
   questionsController.addQuestionHandler,
 );
@@ -34,7 +33,6 @@ router.put(
   "/:technologyName/:rowIndex",
   writeLimiter,
   authenticateToken,
-  authenticateGoogleToken,
   validateRowIndex,
   validateQuestion,
   questionsController.updateQuestionHandler,
@@ -45,7 +43,6 @@ router.delete(
   "/:technologyName/:rowIndex",
   writeLimiter,
   authenticateToken,
-  authenticateGoogleToken,
   validateRowIndex,
   questionsController.deleteQuestionHandler,
 );
@@ -55,7 +52,6 @@ router.post(
   "/:technologyName/reorder",
   writeLimiter,
   authenticateToken,
-  authenticateGoogleToken,
   questionsController.reorderQuestionsHandler,
 );
 

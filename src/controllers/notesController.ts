@@ -10,8 +10,8 @@ import {
   sendValidationError,
 } from "../utils/responseHelper";
 import {
-  getTabsFromSheet,
-  getAllNotesFromSheet,
+  getTabs,
+  getAllNotes,
   getNotesByTab,
   getNotesByColumn,
   getTabHeadings,
@@ -19,19 +19,20 @@ import {
   updateNoteInAllNotes,
   updateNoteTag,
   deleteNoteFromAllNotes,
-  type NotesTab,
-  type Note,
-} from "../services/googleSheets/notes";
-import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
+  createTab,
+  updateTab,
+  deleteTab,
+  reorderTabs,
+  toggleTabPin,
+} from "../services/mongodb/notes";
 
 /**
- * Get all tabs from "Tabs" sheet
+ * Get all tabs
  */
-export const getTabs = asyncHandler(async (req: Request, res: Response) => {
+export const getTabsHandler = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const tabs = await getTabsFromSheet(email, googleToken);
+    const userId = req.user!.userId;
+    const tabs = await getTabs(userId);
     return sendSuccess(res, tabs, "Tabs retrieved successfully");
   } catch (error: any) {
     return sendError(res, error?.message || "Failed to retrieve tabs", 500);
@@ -39,13 +40,12 @@ export const getTabs = asyncHandler(async (req: Request, res: Response) => {
 });
 
 /**
- * Get all notes from "All Notes" sheet
+ * Get all notes from "All Notes"
  */
-export const getAllNotes = asyncHandler(async (req: Request, res: Response) => {
+export const getAllNotesHandler = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const notes = await getAllNotesFromSheet(email, googleToken);
+    const userId = req.user!.userId;
+    const notes = await getAllNotes(userId);
     return sendSuccess(res, notes, "Notes retrieved successfully");
   } catch (error: any) {
     return sendError(res, error?.message || "Failed to retrieve notes", 500);
@@ -63,9 +63,8 @@ export const getNotes = asyncHandler(async (req: Request, res: Response) => {
   }
 
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const notes = await getNotesByTab(tabName, email, googleToken);
+    const userId = req.user!.userId;
+    const notes = await getNotesByTab(tabName, userId);
     return sendSuccess(res, notes, "Notes retrieved successfully");
   } catch (error: any) {
     return sendError(res, error?.message || "Failed to retrieve notes", 500);
@@ -84,9 +83,8 @@ export const getNotesByColumnForTab = asyncHandler(
     }
 
     try {
-      const email = req.user?.email || null;
-      const googleToken = getGoogleTokenFromRequest(req);
-      const notesByColumn = await getNotesByColumn(tabName, email, googleToken);
+      const userId = req.user!.userId;
+      const notesByColumn = await getNotesByColumn(tabName, userId);
       return sendSuccess(
         res,
         notesByColumn,
@@ -113,9 +111,8 @@ export const getHeadings = asyncHandler(async (req: Request, res: Response) => {
   }
 
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const headings = await getTabHeadings(tabName, email, googleToken);
+    const userId = req.user!.userId;
+    const headings = await getTabHeadings(tabName, userId);
     return sendSuccess(res, headings, "Headings retrieved successfully");
   } catch (error: any) {
     return sendError(res, error?.message || "Failed to retrieve headings", 500);
@@ -134,8 +131,7 @@ export const addNote = asyncHandler(async (req: Request, res: Response) => {
   }
 
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
+    const userId = req.user!.userId;
     const success = await addNoteToAllNotes(
       {
         tabId,
@@ -145,8 +141,7 @@ export const addNote = asyncHandler(async (req: Request, res: Response) => {
         description3,
         starred,
       },
-      email,
-      googleToken,
+      userId,
     );
 
     if (success) {
@@ -180,10 +175,17 @@ export const updateNote = asyncHandler(async (req: Request, res: Response) => {
   }
 
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
+    const userId = req.user!.userId;
+    // Get notes to find the note ID
+    const notes = await getAllNotes(userId);
+    const noteToUpdate = notes[rowIndexNum];
+    
+    if (!noteToUpdate) {
+      return sendError(res, "Note not found", 404);
+    }
+
     const success = await updateNoteInAllNotes(
-      rowIndexNum,
+      noteToUpdate.id,
       {
         title,
         description,
@@ -191,8 +193,7 @@ export const updateNote = asyncHandler(async (req: Request, res: Response) => {
         description3,
         starred,
       },
-      email,
-      googleToken,
+      userId,
     );
 
     if (success) {
@@ -227,13 +228,19 @@ export const updateNoteTagHandler = asyncHandler(
     }
 
     try {
-      const email = req.user?.email || null;
-      const googleToken = getGoogleTokenFromRequest(req);
+      const userId = req.user!.userId;
+      // Get notes to find the note ID
+      const notes = await getAllNotes(userId);
+      const noteToUpdate = notes[rowIndexNum];
+      
+      if (!noteToUpdate) {
+        return sendError(res, "Note not found", 404);
+      }
+
       const success = await updateNoteTag(
-        rowIndexNum,
+        noteToUpdate.id,
         newTabId.trim(),
-        email,
-        googleToken,
+        userId,
       );
 
       if (success) {
@@ -263,13 +270,16 @@ export const deleteNote = asyncHandler(async (req: Request, res: Response) => {
   }
 
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const success = await deleteNoteFromAllNotes(
-      rowIndexNum,
-      email,
-      googleToken,
-    );
+    const userId = req.user!.userId;
+    // Get notes to find the note ID
+    const notes = await getAllNotes(userId);
+    const noteToDelete = notes[rowIndexNum];
+    
+    if (!noteToDelete) {
+      return sendError(res, "Note not found", 404);
+    }
+
+    const success = await deleteNoteFromAllNotes(noteToDelete.id, userId);
 
     if (success) {
       return sendSuccess(res, null, "Note deleted successfully");
@@ -278,5 +288,130 @@ export const deleteNote = asyncHandler(async (req: Request, res: Response) => {
     }
   } catch (error: any) {
     return sendError(res, error?.message || "Failed to delete note", 500);
+  }
+});
+
+/**
+ * Create a new tab
+ */
+export const createTabHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { name } = req.body;
+
+  if (!name || typeof name !== "string" || name.trim() === "") {
+    return sendValidationError(res, "Tab name is required");
+  }
+
+  try {
+    const userId = req.user!.userId;
+    const result = await createTab(name.trim(), userId);
+
+    if (result.success) {
+      return sendSuccess(res, null, "Tab created successfully");
+    } else {
+      return sendError(res, result.error || "Failed to create tab", 400);
+    }
+  } catch (error: any) {
+    return sendError(res, error?.message || "Failed to create tab", 500);
+  }
+});
+
+/**
+ * Update a tab (rename)
+ */
+export const updateTabHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { tabId } = req.params;
+  const { newName } = req.body;
+
+  if (!tabId) {
+    return sendValidationError(res, "Tab ID is required");
+  }
+
+  if (!newName || typeof newName !== "string" || newName.trim() === "") {
+    return sendValidationError(res, "New name is required");
+  }
+
+  try {
+    const userId = req.user!.userId;
+    const success = await updateTab(tabId, newName.trim(), userId);
+
+    if (success) {
+      return sendSuccess(res, null, "Tab updated successfully");
+    } else {
+      return sendError(res, "Failed to update tab (may already exist)", 400);
+    }
+  } catch (error: any) {
+    return sendError(res, error?.message || "Failed to update tab", 500);
+  }
+});
+
+/**
+ * Delete a tab
+ */
+export const deleteTabHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { tabId } = req.params;
+
+  if (!tabId) {
+    return sendValidationError(res, "Tab ID is required");
+  }
+
+  try {
+    const userId = req.user!.userId;
+    const success = await deleteTab(tabId, userId);
+
+    if (success) {
+      return sendSuccess(res, null, "Tab deleted successfully");
+    } else {
+      return sendError(res, "Failed to delete tab", 500);
+    }
+  } catch (error: any) {
+    return sendError(res, error?.message || "Failed to delete tab", 500);
+  }
+});
+
+/**
+ * Reorder tabs
+ */
+export const reorderTabsHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { tabIds } = req.body;
+
+  if (!Array.isArray(tabIds)) {
+    return sendValidationError(res, "tabIds must be an array");
+  }
+
+  try {
+    const userId = req.user!.userId;
+    const success = await reorderTabs(tabIds, userId);
+
+    if (success) {
+      return sendSuccess(res, null, "Tabs reordered successfully");
+    } else {
+      return sendError(res, "Failed to reorder tabs", 500);
+    }
+  } catch (error: any) {
+    return sendError(res, error?.message || "Failed to reorder tabs", 500);
+  }
+});
+
+/**
+ * Toggle tab pin status
+ */
+export const toggleTabPinHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { tabId } = req.params;
+
+  if (!tabId) {
+    return sendValidationError(res, "Tab ID is required");
+  }
+
+  try {
+    const userId = req.user!.userId;
+    const success = await toggleTabPin(tabId, userId);
+
+    if (success) {
+      return sendSuccess(res, null, "Tab pin status toggled successfully");
+    } else {
+      return sendError(res, "Failed to toggle tab pin status", 500);
+    }
+  } catch (error: any) {
+    return sendError(res, error?.message || "Failed to toggle tab pin status", 500);
   }
 });

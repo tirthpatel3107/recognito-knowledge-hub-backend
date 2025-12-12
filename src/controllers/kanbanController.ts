@@ -12,18 +12,16 @@ import {
 import {
   getKanbanTasks,
   saveKanbanTasks,
-  type KanbanTask,
-} from "../services/googleSheets/kanban";
-import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
+  type KanbanTaskResult,
+} from "../services/mongodb/kanban";
 
 /**
  * Get all kanban tasks grouped by column
  */
 export const getTasks = asyncHandler(async (req: Request, res: Response) => {
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const tasksByColumn = await getKanbanTasks(email, googleToken);
+    const userId = req.user!.userId;
+    const tasksByColumn = await getKanbanTasks(userId);
     return sendSuccess(res, tasksByColumn, "Tasks retrieved successfully");
   } catch (error: any) {
     return sendError(res, error?.message || "Failed to retrieve tasks", 500);
@@ -41,11 +39,10 @@ export const saveTasks = asyncHandler(async (req: Request, res: Response) => {
   }
 
   try {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
+    const userId = req.user!.userId;
 
     // Flatten tasks from all columns
-    const allTasks: KanbanTask[] = [];
+    const allTasks: KanbanTaskResult[] = [];
     if (tasks) {
       Object.values(tasks).forEach((columnTasks: any) => {
         if (Array.isArray(columnTasks)) {
@@ -54,7 +51,7 @@ export const saveTasks = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    const success = await saveKanbanTasks(allTasks, email, googleToken);
+    const success = await saveKanbanTasks(allTasks, userId);
     if (success) {
       return sendSuccess(res, null, "Tasks saved successfully");
     } else {

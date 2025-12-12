@@ -2,7 +2,7 @@
  * Technologies Routes
  */
 import express from "express";
-import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import { authenticateToken } from "../middleware/auth";
 import * as technologiesController from "../controllers/technologiesController";
 import { writeLimiter } from "../middleware/rateLimiter";
 import {
@@ -21,7 +21,6 @@ router.post(
   "/",
   writeLimiter,
   authenticateToken,
-  authenticateGoogleToken,
   validateTechnology,
   technologiesController.createTechnologyHandler,
 );
@@ -31,7 +30,6 @@ router.put(
   "/:sheetId",
   writeLimiter,
   authenticateToken,
-  authenticateGoogleToken,
   validateSheetId,
   validateTechnologyUpdate,
   technologiesController.updateTechnologyHandler,
@@ -42,7 +40,6 @@ router.delete(
   "/:sheetId",
   writeLimiter,
   authenticateToken,
-  authenticateGoogleToken,
   validateSheetId,
   technologiesController.deleteTechnologyHandler,
 );
@@ -52,7 +49,6 @@ router.post(
   "/reorder",
   writeLimiter,
   authenticateToken,
-  authenticateGoogleToken,
   technologiesController.reorderTechnologiesHandler,
 );
 

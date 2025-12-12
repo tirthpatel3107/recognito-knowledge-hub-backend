@@ -2,7 +2,7 @@
  * Practical Task Technologies Routes
  */
 import express from "express";
-import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import { authenticateToken } from "../middleware/auth";
 import * as practicalTaskTechnologiesController from "../controllers/practicalTaskTechnologiesController";
 
 const router = express.Router();
@@ -18,7 +18,6 @@ router.get(
 router.post(
   "/",
   authenticateToken,
-  authenticateGoogleToken,
   practicalTaskTechnologiesController.createPracticalTaskTechnologyHandler,
 );
 
@@ -26,7 +25,6 @@ router.post(
 router.put(
   "/:sheetId",
   authenticateToken,
-  authenticateGoogleToken,
   practicalTaskTechnologiesController.updatePracticalTaskTechnologyHandler,
 );
 
@@ -34,7 +32,6 @@ router.put(
 router.delete(
   "/:sheetId",
   authenticateToken,
-  authenticateGoogleToken,
   practicalTaskTechnologiesController.deletePracticalTaskTechnologyHandler,
 );
 
@@ -42,7 +39,6 @@ router.delete(
 router.post(
   "/reorder",
   authenticateToken,
-  authenticateGoogleToken,
   practicalTaskTechnologiesController.reorderPracticalTaskTechnologiesHandler,
 );
 

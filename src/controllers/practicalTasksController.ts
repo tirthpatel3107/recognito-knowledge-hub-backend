@@ -5,32 +5,24 @@
 import { Request, Response } from "express";
 import {
   getPracticalTasks,
-  getPracticalTasksByTechnology,
   addPracticalTask,
   updatePracticalTask,
   deletePracticalTask,
   reorderPracticalTasks,
-  getPracticalTaskTechnologies,
-  setUserCredentials,
-} from "../services/googleSheets";
+} from "../services/mongodb/practicalTasks";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
   sendError,
   sendValidationError,
-  sendNotFound,
 } from "../utils/responseHelper";
-import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 /**
- * Get all practical tasks
+ * Get all practical tasks (deprecated - use getPracticalTasksByTechnology)
  */
 export const getAllPracticalTasks = asyncHandler(
   async (req: Request, res: Response) => {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const tasks = await getPracticalTasks(email, googleToken);
-    return sendSuccess(res, tasks);
+    return sendError(res, "Please use /practical-tasks/:technologyName endpoint", 400);
   },
 );
 
@@ -40,8 +32,6 @@ export const getAllPracticalTasks = asyncHandler(
 export const getPracticalTasksByTechnologyHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const { technologyName } = req.params;
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
 
     // Parse pagination parameters from query string
     const page = req.query.page
@@ -59,13 +49,7 @@ export const getPracticalTasksByTechnologyHandler = asyncHandler(
       return sendValidationError(res, "Limit must be a positive integer");
     }
 
-    const tasks = await getPracticalTasksByTechnology(
-      technologyName,
-      email,
-      googleToken,
-      page,
-      limit,
-    );
+    const tasks = await getPracticalTasks(technologyName, page, limit);
     return sendSuccess(res, tasks);
   },
 );
@@ -75,28 +59,20 @@ export const getPracticalTasksByTechnologyHandler = asyncHandler(
  */
 export const addPracticalTaskHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { technologyName } = req.params;
     const { question, answer, example, priority } = req.body;
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
 
     if (!question || !answer) {
       return sendValidationError(res, "Question and answer are required");
     }
 
     try {
-      const success = await addPracticalTask(
-        technologyName,
-        {
-          question,
-          answer,
-          example,
-          priority: priority || "low",
-        },
-        email,
-        googleToken,
-      );
+      const success = await addPracticalTask(technologyName, {
+        question,
+        answer,
+        example,
+        priority: priority || "low",
+      });
 
       if (success) {
         return sendSuccess(res, null, "Practical task added successfully");
@@ -106,7 +82,6 @@ export const addPracticalTaskHandler = asyncHandler(
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      console.error("Error in addPracticalTaskHandler:", error);
       return sendError(res, errorMessage, 500);
     }
   },
@@ -117,22 +92,26 @@ export const addPracticalTaskHandler = asyncHandler(
  */
 export const updatePracticalTaskHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { technologyName, rowIndex } = req.params;
     const { question, answer, example, priority } = req.body;
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
 
     if (!question || !answer) {
       return sendValidationError(res, "Question and answer are required");
     }
 
+    // Get tasks to find the task ID
+    const tasks = await getPracticalTasks(technologyName);
+    const taskArray = Array.isArray(tasks) ? tasks : tasks.data;
+    const taskToUpdate = taskArray[parseInt(rowIndex)];
+
+    if (!taskToUpdate) {
+      return sendError(res, "Practical task not found", 404);
+    }
+
     const success = await updatePracticalTask(
       technologyName,
-      parseInt(rowIndex),
+      taskToUpdate.id,
       { question, answer, example, priority: priority || "low" },
-      email,
-      googleToken,
     );
 
     if (success) {
@@ -148,25 +127,18 @@ export const updatePracticalTaskHandler = asyncHandler(
  */
 export const deletePracticalTaskHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { technologyName, rowIndex } = req.params;
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
 
-    // Get sheet ID for the technology
-    const technologies = await getPracticalTaskTechnologies(googleToken, email);
-    const tech = technologies.find((t) => t.name === technologyName);
+    // Get tasks to find the task ID
+    const tasks = await getPracticalTasks(technologyName);
+    const taskArray = Array.isArray(tasks) ? tasks : tasks.data;
+    const taskToDelete = taskArray[parseInt(rowIndex)];
 
-    if (!tech || tech.sheetId === undefined) {
-      return sendNotFound(res, "Technology");
+    if (!taskToDelete) {
+      return sendError(res, "Practical task not found", 404);
     }
 
-    const success = await deletePracticalTask(
-      technologyName,
-      parseInt(rowIndex),
-      email,
-      googleToken,
-    );
+    const success = await deletePracticalTask(technologyName, taskToDelete.id);
 
     if (success) {
       return sendSuccess(res, null, "Practical task deleted successfully");
@@ -181,26 +153,14 @@ export const deletePracticalTaskHandler = asyncHandler(
  */
 export const reorderPracticalTasksHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { technologyName } = req.params;
-    const { oldIndex, newIndex } = req.body;
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
+    const { taskIds } = req.body;
 
-    if (typeof oldIndex !== "number" || typeof newIndex !== "number") {
-      return sendValidationError(
-        res,
-        "oldIndex and newIndex are required and must be numbers",
-      );
+    if (!Array.isArray(taskIds)) {
+      return sendValidationError(res, "taskIds must be an array");
     }
 
-    const success = await reorderPracticalTasks(
-      technologyName,
-      oldIndex,
-      newIndex,
-      email,
-      googleToken,
-    );
+    const success = await reorderPracticalTasks(technologyName, taskIds);
 
     if (success) {
       return sendSuccess(res, null, "Practical tasks reordered successfully");

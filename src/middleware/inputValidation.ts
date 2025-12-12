@@ -44,10 +44,6 @@ export const validateLogin = [
     .trim()
     .isLength({ min: 6 })
     .withMessage("Password must be at least 6 characters long"),
-  body("googleAccessToken")
-    .trim()
-    .notEmpty()
-    .withMessage("Google access token is required"),
   validate,
 ];
 
@@ -164,12 +160,13 @@ export const validateId = [
 
 /**
  * Validation rules for sheet ID parameters
+ * Accepts either numeric IDs (for backward compatibility) or MongoDB ObjectIds (24 hex characters)
  */
 export const validateSheetId = [
   param("sheetId")
     .trim()
-    .matches(/^\d+$/)
-    .withMessage("Sheet ID must be a valid number"),
+    .matches(/^(\d+|[0-9a-fA-F]{24})$/)
+    .withMessage("Sheet ID must be a valid number or MongoDB ObjectId"),
   validate,
 ];
 

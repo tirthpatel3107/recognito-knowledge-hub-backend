@@ -2,7 +2,7 @@
  * Tags Routes
  */
 import express from "express";
-import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import { authenticateToken } from "../middleware/auth";
 import * as tagsController from "../controllers/tagsController";
 
 const router = express.Router();
@@ -14,7 +14,6 @@ router.get("/", authenticateToken, tagsController.getAllTags);
 router.post(
   "/",
   authenticateToken,
-  authenticateGoogleToken,
   tagsController.addTagHandler,
 );
 
@@ -22,7 +21,6 @@ router.post(
 router.put(
   "/:rowIndex",
   authenticateToken,
-  authenticateGoogleToken,
   tagsController.updateTagHandler,
 );
 
@@ -30,7 +28,6 @@ router.put(
 router.delete(
   "/:rowIndex",
   authenticateToken,
-  authenticateGoogleToken,
   tagsController.deleteTagHandler,
 );
 

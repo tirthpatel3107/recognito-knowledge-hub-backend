@@ -4,17 +4,14 @@
  */
 import { Request, Response } from "express";
 import {
-  getDashboardCardOrder,
-  saveDashboardCardOrder,
+  getDashboardOrder,
+  updateDashboardOrder,
   getUserProfile,
   updateUserProfile,
-  updateUserPassword,
-  setUserCredentials,
-  getUserColorPalette,
-  updateUserColorPalette,
-  getUserSpreadsheetIds,
-} from "../services/googleSheets";
-import { getGoogleToken } from "../services/googleTokenStore";
+  updateUserPhoto,
+} from "../services/mongodb/userProfile";
+import { User } from "../models/User.js";
+import bcrypt from "bcryptjs";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
@@ -22,7 +19,6 @@ import {
   sendValidationError,
   sendUnauthorized,
 } from "../utils/responseHelper";
-import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 /**
  * Get dashboard card order
@@ -30,8 +26,7 @@ import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 export const getDashboardCardOrderHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const email = req.user!.email;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const cardOrder = await getDashboardCardOrder(email, googleToken);
+    const cardOrder = await getDashboardOrder(email);
     return sendSuccess(res, cardOrder);
   },
 );
@@ -42,14 +37,13 @@ export const getDashboardCardOrderHandler = asyncHandler(
 export const saveDashboardCardOrderHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const email = req.user!.email;
-    const googleToken = getGoogleTokenFromRequest(req);
     const { cardOrder } = req.body;
 
     if (!Array.isArray(cardOrder)) {
       return sendValidationError(res, "cardOrder must be an array");
     }
 
-    const success = await saveDashboardCardOrder(email, cardOrder, googleToken);
+    const success = await updateDashboardOrder(email, cardOrder);
 
     if (success) {
       return sendSuccess(res, null, "Dashboard card order saved successfully");
@@ -65,8 +59,7 @@ export const saveDashboardCardOrderHandler = asyncHandler(
 export const getUserProfileHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const email = req.user!.email;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const profile = await getUserProfile(email, googleToken);
+    const profile = await getUserProfile(email);
     return sendSuccess(res, profile);
   },
 );
@@ -77,7 +70,6 @@ export const getUserProfileHandler = asyncHandler(
 export const updateUserProfileHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const email = req.user!.email;
-    const googleToken = getGoogleTokenFromRequest(req);
     const { username, photo } = req.body;
 
     // Username is optional (can be updated separately), but validate if provided
@@ -86,20 +78,21 @@ export const updateUserProfileHandler = asyncHandler(
     }
 
     try {
-      const success = await updateUserProfile(
-        email,
-        username !== undefined ? username.trim() : undefined,
-        photo !== undefined ? photo : null,
-        googleToken,
-      );
-
-      if (success) {
-        return sendSuccess(res, null, "Profile updated successfully");
-      } else {
-        return sendError(res, "Failed to update profile", 500);
+      // Update username in User model if provided
+      if (username !== undefined) {
+        await User.findOneAndUpdate(
+          { email, deletedAt: null },
+          { username: username.trim() },
+        );
       }
+
+      // Update photo in User model if provided
+      if (photo !== undefined) {
+        await updateUserPhoto(email, photo || "");
+      }
+
+      return sendSuccess(res, null, "Profile updated successfully");
     } catch (error) {
-      // Error in updateUserProfileHandler
       const errorMessage =
         error instanceof Error ? error.message : "Failed to update profile";
       return sendError(res, errorMessage, 500);
@@ -112,7 +105,6 @@ export const updateUserProfileHandler = asyncHandler(
  */
 export const updateUserPasswordHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const email = req.user!.email;
     const { currentPassword, newPassword } = req.body;
 
@@ -139,23 +131,27 @@ export const updateUserPasswordHandler = asyncHandler(
     }
 
     try {
-      const success = await updateUserPassword(
-        email,
-        currentPassword,
-        newPassword,
-      );
-
-      if (success) {
-        return sendSuccess(res, null, "Password changed successfully");
-      } else {
-        return sendError(res, "Failed to change password", 500);
+      const user = await User.findOne({ email, deletedAt: null });
+      if (!user) {
+        return sendError(res, "User not found", 404);
       }
+
+      // Verify current password
+      const isPasswordValid = await user.comparePassword(currentPassword);
+      if (!isPasswordValid) {
+        return sendError(res, "Current password is incorrect", 401);
+      }
+
+      // Update password (User model will hash it automatically)
+      user.password = newPassword;
+      await user.save();
+
+      return sendSuccess(res, null, "Password changed successfully");
     } catch (error: any) {
-      // Provide specific error message for incorrect password
       const errorMessage = error.message || "Failed to change password";
       const statusCode =
         error.message === "Current password is incorrect" ? 401 : 500;
-      return sendError(res, errorMessage, statusCode, { details: error.stack });
+      return sendError(res, errorMessage, statusCode);
     }
   },
 );
@@ -166,9 +162,8 @@ export const updateUserPasswordHandler = asyncHandler(
 export const getUserColorPaletteHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const email = req.user!.email;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const palette = await getUserColorPalette(email, googleToken);
-    return sendSuccess(res, palette);
+    const profile = await getUserProfile(email);
+    return sendSuccess(res, profile?.colorPalette || { darkModeColor: null });
   },
 );
 
@@ -177,7 +172,6 @@ export const getUserColorPaletteHandler = asyncHandler(
  */
 export const updateUserColorPaletteHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const email = req.user!.email;
     const { lightModeColor, darkModeColor } = req.body;
 
@@ -199,12 +193,12 @@ export const updateUserColorPaletteHandler = asyncHandler(
         ? null
         : darkModeColor;
 
-    const success = await updateUserColorPalette(
-      email,
-      null, // lightModeColor is no longer used
-      darkColorValue,
-      req.googleToken!,
-    );
+    const success = await updateUserProfile(email, {
+      colorPalette: {
+        lightModeColor: null, // lightModeColor is no longer used
+        darkModeColor: darkColorValue,
+      },
+    });
 
     if (success) {
       return sendSuccess(res, null, "Color palette updated successfully");
@@ -215,13 +209,11 @@ export const updateUserColorPaletteHandler = asyncHandler(
 );
 
 /**
- * Get user-specific spreadsheet IDs
+ * Get user-specific spreadsheet IDs (deprecated - no longer needed with MongoDB)
  */
 export const getUserSpreadsheetIdsHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    const email = req.user!.email;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const spreadsheetIds = await getUserSpreadsheetIds(email, googleToken);
-    return sendSuccess(res, spreadsheetIds);
+    // Return empty object since we no longer use Google Sheets
+    return sendSuccess(res, {});
   },
 );

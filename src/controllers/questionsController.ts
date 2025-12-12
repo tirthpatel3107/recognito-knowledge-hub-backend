@@ -9,17 +9,13 @@ import {
   updateQuestion,
   deleteQuestion,
   reorderQuestions,
-  getTechnologies,
-  setUserCredentials,
-} from "../services/googleSheets";
+} from "../services/mongodb/questions";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
   sendError,
   sendValidationError,
-  sendNotFound,
 } from "../utils/responseHelper";
-import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 
 /**
  * Get questions for a technology
@@ -27,7 +23,6 @@ import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
 export const getQuestionsByTechnology = asyncHandler(
   async (req: Request, res: Response) => {
     const { technologyName } = req.params;
-    const googleToken = getGoogleTokenFromRequest(req);
 
     // Parse pagination parameters from query string
     const page = req.query.page
@@ -45,14 +40,7 @@ export const getQuestionsByTechnology = asyncHandler(
       return sendValidationError(res, "Limit must be a positive integer");
     }
 
-    const email = req.user?.email || null;
-    const questions = await getQuestions(
-      technologyName,
-      googleToken,
-      page,
-      limit,
-      email,
-    );
+    const questions = await getQuestions(technologyName, page, limit);
     return sendSuccess(res, questions);
   },
 );
@@ -62,8 +50,6 @@ export const getQuestionsByTechnology = asyncHandler(
  */
 export const addQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
-    const email = req.user?.email || null;
     const { technologyName } = req.params;
     const { question, answer, example, priority } = req.body;
 
@@ -71,17 +57,12 @@ export const addQuestionHandler = asyncHandler(
       return sendValidationError(res, "Question and answer are required");
     }
 
-    const success = await addQuestion(
-      technologyName,
-      {
-        question,
-        answer,
-        example,
-        priority: priority || "low",
-      },
-      email,
-      req.googleToken!,
-    );
+    const success = await addQuestion(technologyName, {
+      question,
+      answer,
+      example,
+      priority: priority || "low",
+    });
 
     if (success) {
       return sendSuccess(res, null, "Question added successfully");
@@ -96,8 +77,6 @@ export const addQuestionHandler = asyncHandler(
  */
 export const updateQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
-    const email = req.user?.email || null;
     const { technologyName, rowIndex } = req.params;
     const { question, answer, example, priority } = req.body;
 
@@ -105,18 +84,12 @@ export const updateQuestionHandler = asyncHandler(
       return sendValidationError(res, "Question and answer are required");
     }
 
-    const success = await updateQuestion(
-      technologyName,
-      parseInt(rowIndex),
-      {
-        question,
-        answer,
-        example,
-        priority: priority || "low",
-      },
-      email,
-      req.googleToken!,
-    );
+    const success = await updateQuestion(technologyName, rowIndex, {
+      question,
+      answer,
+      example,
+      priority: priority || "low",
+    });
 
     if (success) {
       return sendSuccess(res, null, "Question updated successfully");
@@ -131,24 +104,9 @@ export const updateQuestionHandler = asyncHandler(
  */
 export const deleteQuestionHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { technologyName, rowIndex } = req.params;
-    const email = req.user?.email || null;
 
-    // Get sheet ID for the technology
-    const technologies = await getTechnologies(req.googleToken!, email);
-    const tech = technologies.find((t) => t.name === technologyName);
-
-    if (!tech || tech.sheetId === undefined) {
-      return sendNotFound(res, "Technology");
-    }
-    const success = await deleteQuestion(
-      technologyName,
-      parseInt(rowIndex),
-      tech.sheetId,
-      req.googleToken!,
-      email,
-    );
+    const success = await deleteQuestion(technologyName, rowIndex);
 
     if (success) {
       return sendSuccess(res, null, "Question deleted successfully");
@@ -163,39 +121,14 @@ export const deleteQuestionHandler = asyncHandler(
  */
 export const reorderQuestionsHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { technologyName } = req.params;
-    const { oldIndex, newIndex } = req.body;
+    const { questionIds } = req.body;
 
-    if (
-      oldIndex === undefined ||
-      newIndex === undefined ||
-      typeof oldIndex !== "number" ||
-      typeof newIndex !== "number"
-    ) {
-      return sendValidationError(
-        res,
-        "oldIndex and newIndex are required numbers",
-      );
+    if (!Array.isArray(questionIds)) {
+      return sendValidationError(res, "questionIds must be an array");
     }
 
-    const email = req.user?.email || null;
-
-    // Get sheet ID for the technology
-    const technologies = await getTechnologies(req.googleToken!, email);
-    const tech = technologies.find((t) => t.name === technologyName);
-
-    if (!tech || tech.sheetId === undefined) {
-      return sendNotFound(res, "Technology");
-    }
-    const success = await reorderQuestions(
-      technologyName,
-      oldIndex,
-      newIndex,
-      tech.sheetId,
-      email,
-      req.googleToken!,
-    );
+    const success = await reorderQuestions(technologyName, questionIds);
 
     if (success) {
       return sendSuccess(res, null, "Questions reordered successfully");

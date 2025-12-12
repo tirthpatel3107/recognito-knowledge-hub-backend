@@ -2,16 +2,16 @@
  * Notes Routes
  */
 import express from "express";
-import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import { authenticateToken } from "../middleware/auth";
 import * as notesController from "../controllers/notesController";
 
 const router = express.Router();
 
 // Get all tabs
-router.get("/tabs", authenticateToken, notesController.getTabs);
+router.get("/tabs", authenticateToken, notesController.getTabsHandler);
 
 // Get all notes from "All Notes" sheet
-router.get("/all", authenticateToken, notesController.getAllNotes);
+router.get("/all", authenticateToken, notesController.getAllNotesHandler);
 
 // Get notes for a specific tab
 router.get("/tab/:tabName", authenticateToken, notesController.getNotes);
@@ -34,7 +34,6 @@ router.get(
 router.post(
   "/all",
   authenticateToken,
-  authenticateGoogleToken,
   notesController.addNote,
 );
 
@@ -42,7 +41,6 @@ router.post(
 router.put(
   "/all/:rowIndex",
   authenticateToken,
-  authenticateGoogleToken,
   notesController.updateNote,
 );
 
@@ -50,7 +48,6 @@ router.put(
 router.put(
   "/all/:rowIndex/tag",
   authenticateToken,
-  authenticateGoogleToken,
   notesController.updateNoteTagHandler,
 );
 
@@ -58,8 +55,23 @@ router.put(
 router.delete(
   "/all/:rowIndex",
   authenticateToken,
-  authenticateGoogleToken,
   notesController.deleteNote,
 );
+
+// Tab management routes
+// Create a new tab
+router.post("/tabs", authenticateToken, notesController.createTabHandler);
+
+// Update a tab (rename)
+router.put("/tabs/:tabId", authenticateToken, notesController.updateTabHandler);
+
+// Delete a tab
+router.delete("/tabs/:tabId", authenticateToken, notesController.deleteTabHandler);
+
+// Reorder tabs
+router.post("/tabs/reorder", authenticateToken, notesController.reorderTabsHandler);
+
+// Toggle tab pin status
+router.put("/tabs/:tabId/pin", authenticateToken, notesController.toggleTabPinHandler);
 
 export default router;

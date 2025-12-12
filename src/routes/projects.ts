@@ -2,7 +2,7 @@
  * Projects Routes
  */
 import express from "express";
-import { authenticateToken, authenticateGoogleToken } from "../middleware/auth";
+import { authenticateToken } from "../middleware/auth";
 import * as projectsController from "../controllers/projectsController";
 
 const router = express.Router();
@@ -14,7 +14,6 @@ router.get("/", authenticateToken, projectsController.getAllProjects);
 router.post(
   "/",
   authenticateToken,
-  authenticateGoogleToken,
   projectsController.addProjectHandler,
 );
 
@@ -22,7 +21,6 @@ router.post(
 router.put(
   "/:rowIndex",
   authenticateToken,
-  authenticateGoogleToken,
   projectsController.updateProjectHandler,
 );
 
@@ -30,7 +28,6 @@ router.put(
 router.delete(
   "/:rowIndex",
   authenticateToken,
-  authenticateGoogleToken,
   projectsController.deleteProjectHandler,
 );
 
@@ -38,7 +35,6 @@ router.delete(
 router.post(
   "/reorder",
   authenticateToken,
-  authenticateGoogleToken,
   projectsController.reorderProjectsHandler,
 );
 

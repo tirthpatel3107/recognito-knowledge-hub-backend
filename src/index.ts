@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
-// Load environment variables (LOGIN_SPREADSHEET_ID lives here)
+// Load environment variables
 // Use explicit path resolution to ensure .env is loaded from the correct directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,21 +16,6 @@ const __dirname = dirname(__filename);
 const envPath = join(__dirname, "..", ".env");
 console.log(`[Backend] Loading environment variables from: ${envPath}`);
 dotenv.config({ path: envPath });
-
-// Verify LOGIN_SPREADSHEET_ID is loaded
-if (!process.env?.LOGIN_SPREADSHEET_ID) {
-  console.warn(
-    `[Backend] WARNING: LOGIN_SPREADSHEET_ID is not set in environment variables`,
-  );
-  console.warn(`[Backend] Looking for .env file at: ${envPath}`);
-  console.warn(
-    `[Backend] Please ensure .env file exists and contains LOGIN_SPREADSHEET_ID`,
-  );
-} else {
-  console.log(`[Backend] LOGIN_SPREADSHEET_ID loaded from .env file`);
-}
-
-// NOTES_SPREADSHEET_ID will be loaded from UserDetail tab in Login spreadsheet during login
 
 // Import routes
 import authRoutes from "./routes/auth.js";
@@ -45,9 +30,8 @@ import tagsRoutes from "./routes/tags.js";
 import kanbanRoutes from "./routes/kanban.js";
 import notesRoutes from "./routes/notes.js";
 
-// Import services to initialize
-import { initializeGoogleSheets } from "./services/googleSheets/index.js";
-import { getServiceConfigValue } from "./config/googleConfig.js";
+// Import database connection
+import { connectDatabase } from "./config/database.js";
 import { errorHandler } from "./utils/errorHandler.js";
 import {
   securityHeaders,
@@ -57,20 +41,7 @@ import { apiLimiter } from "./middleware/rateLimiter.js";
 
 const app = express();
 
-const PORT = Number(getServiceConfigValue("PORT")) || 3001;
-
-// Initialize Google Sheets service (will be refreshed after config loads)
-console.log(`[Backend] Initializing Google Sheets service...`);
-try {
-  initializeGoogleSheets();
-  console.log(`[Backend] Google Sheets service initialized successfully`);
-} catch (error) {
-  console.error(
-    `[Backend] ERROR: Failed to initialize Google Sheets service:`,
-    error,
-  );
-  throw error;
-}
+const PORT = Number(process.env.PORT) || 3001;
 
 // CORS configuration - Allow all origins (no restrictions)
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -156,20 +127,28 @@ app.use((req: Request, res: Response) => {
 // Error handler - ensure CORS headers are set even on errors
 app.use(errorHandler);
 
-// Start server
-console.log(`[Backend] Starting server on port ${PORT}...`);
-try {
-  app.listen(PORT, () => {
-    console.log(`[Backend] ✅ Server started successfully!`);
-    console.log(`[Backend] Server is running on http://localhost:${PORT}`);
-    console.log(
-      `[Backend] Health check available at http://localhost:${PORT}/health`,
-    );
-  });
-} catch (error) {
-  console.error(`[Backend] ❌ ERROR: Failed to start server:`, error);
-  process.exit(1);
-}
+// Connect to MongoDB and start server
+const startServer = async () => {
+  try {
+    // Connect to MongoDB
+    await connectDatabase();
+
+    // Start server
+    console.log(`[Backend] Starting server on port ${PORT}...`);
+    app.listen(PORT, () => {
+      console.log(`[Backend] ✅ Server started successfully!`);
+      console.log(`[Backend] Server is running on http://localhost:${PORT}`);
+      console.log(
+        `[Backend] Health check available at http://localhost:${PORT}/health`,
+      );
+    });
+  } catch (error) {
+    console.error(`[Backend] ❌ ERROR: Failed to start server:`, error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 // Handle uncaught errors
 process.on("uncaughtException", (error) => {

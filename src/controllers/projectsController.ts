@@ -9,61 +9,21 @@ import {
   updateProject,
   deleteProject,
   reorderProjects,
-  setUserCredentials,
-  getSheetsClient,
-  findSheetByName,
-} from "../services/googleSheets";
+} from "../services/mongodb/projects";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
   sendSuccess,
   sendError,
   sendValidationError,
-  sendNotFound,
 } from "../utils/responseHelper";
-import { getGoogleTokenFromRequest } from "../utils/googleTokenHelper";
-
-// Helper to get sheet ID for "Project List" sheet
-// Note: Project List sheet (tab) is inside the WORK_SUMMARY spreadsheet, not PROJECT_LISTING
-// This uses the findSheetByName utility for consistent sheet matching logic
-const getProjectListSheetId = async (
-  email: string | null,
-  accessToken: string | null = null,
-): Promise<{ sheetId?: number; availableSheets?: string[] }> => {
-  try {
-    const { getUserWorkSummarySpreadsheetId } = await import(
-      "../services/googleSheets/userProfile"
-    );
-    const spreadsheetId = await getUserWorkSummarySpreadsheetId(
-      email,
-      accessToken,
-    );
-
-    const result = await findSheetByName(
-      spreadsheetId,
-      "Project List",
-      accessToken,
-    );
-
-    // Check if sheetId exists (using !== undefined to handle 0 as valid sheetId)
-    if (result.sheetId === undefined || result.sheetId === null) {
-      return { availableSheets: result.availableSheets };
-    }
-
-    return { sheetId: result.sheetId, availableSheets: result.availableSheets };
-  } catch {
-    // Error getting Project List sheet ID
-    return { availableSheets: [] };
-  }
-};
 
 /**
- * Get all projects
+ * Get all projects for the authenticated user
  */
 export const getAllProjects = asyncHandler(
   async (req: Request, res: Response) => {
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const projects = await getProjects(email, googleToken);
+    const userId = req.user!.userId;
+    const projects = await getProjects(userId);
     return sendSuccess(res, projects);
   },
 );
@@ -73,10 +33,7 @@ export const getAllProjects = asyncHandler(
  */
 export const addProjectHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { project, projectId } = req.body;
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
 
     if (!project || !projectId) {
       return sendValidationError(
@@ -85,11 +42,8 @@ export const addProjectHandler = asyncHandler(
       );
     }
 
-    const success = await addProject(
-      { project, projectId },
-      email,
-      googleToken,
-    );
+    const userId = req.user!.userId;
+    const success = await addProject({ project, projectId }, userId);
 
     if (success) {
       return sendSuccess(res, null, "Project added successfully");
@@ -104,11 +58,8 @@ export const addProjectHandler = asyncHandler(
  */
 export const updateProjectHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { rowIndex } = req.params;
     const { project, projectId, oldProjectName } = req.body;
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
 
     if (!project || !projectId) {
       return sendValidationError(
@@ -117,14 +68,18 @@ export const updateProjectHandler = asyncHandler(
       );
     }
 
+    // Get the project to find its current projectId
+    const userId = req.user!.userId;
+    const projects = await getProjects(userId);
+    const projectToUpdate = projects[parseInt(rowIndex)];
+    if (!projectToUpdate) {
+      return sendError(res, "Project not found", 404);
+    }
+
     const success = await updateProject(
-      parseInt(rowIndex),
-      {
-        project,
-        projectId,
-      },
-      email,
-      googleToken,
+      projectToUpdate.projectId,
+      { project, projectId },
+      userId,
       oldProjectName,
     );
 
@@ -141,7 +96,6 @@ export const updateProjectHandler = asyncHandler(
  */
 export const deleteProjectHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
     const { rowIndex } = req.params;
 
     if (!rowIndex || isNaN(parseInt(rowIndex))) {
@@ -151,28 +105,15 @@ export const deleteProjectHandler = asyncHandler(
       );
     }
 
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-
-    const result = await getProjectListSheetId(email, googleToken);
-
-    // Check if sheetId exists (using !== undefined to handle 0 as valid sheetId)
-    if (result.sheetId === undefined || result.sheetId === null) {
-      const availableSheets = result.availableSheets?.join(", ") || "none";
-      return sendNotFound(
-        res,
-        `Project List sheet (tab) not found in Work Summary spreadsheet. Available sheets (tabs): ${availableSheets}. Please ensure the tab is named exactly "Project List".`,
-      );
+    // Get the project to find its projectId
+    const userId = req.user!.userId;
+    const projects = await getProjects(userId);
+    const projectToDelete = projects[parseInt(rowIndex)];
+    if (!projectToDelete) {
+      return sendError(res, "Project not found", 404);
     }
 
-    const parsedRowIndex = parseInt(rowIndex);
-
-    const success = await deleteProject(
-      parsedRowIndex,
-      result.sheetId,
-      email,
-      googleToken,
-    );
+    const success = await deleteProject(projectToDelete.projectId, userId);
 
     if (success) {
       return sendSuccess(res, null, "Project deleted successfully");
@@ -187,41 +128,14 @@ export const deleteProjectHandler = asyncHandler(
  */
 export const reorderProjectsHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    setUserCredentials(req.googleToken!);
-    const { oldIndex, newIndex } = req.body;
+    const { projectIds } = req.body;
 
-    if (
-      oldIndex === undefined ||
-      newIndex === undefined ||
-      typeof oldIndex !== "number" ||
-      typeof newIndex !== "number"
-    ) {
-      return sendValidationError(
-        res,
-        "oldIndex and newIndex are required numbers",
-      );
+    if (!Array.isArray(projectIds)) {
+      return sendValidationError(res, "projectIds must be an array");
     }
 
-    const email = req.user?.email || null;
-    const googleToken = getGoogleTokenFromRequest(req);
-    const result = await getProjectListSheetId(email, googleToken);
-
-    // Check if sheetId exists (using !== undefined to handle 0 as valid sheetId)
-    if (result.sheetId === undefined || result.sheetId === null) {
-      const availableSheets = result.availableSheets?.join(", ") || "none";
-      return sendNotFound(
-        res,
-        `Project List sheet (tab) not found in Work Summary spreadsheet. Available sheets (tabs): ${availableSheets}. Please ensure the tab is named exactly "Project List".`,
-      );
-    }
-
-    const success = await reorderProjects(
-      oldIndex,
-      newIndex,
-      result.sheetId,
-      email,
-      googleToken,
-    );
+    const userId = req.user!.userId;
+    const success = await reorderProjects(projectIds, userId);
 
     if (success) {
       return sendSuccess(res, null, "Projects reordered successfully");
