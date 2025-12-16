@@ -20,12 +20,48 @@ export const connectDatabase = async (): Promise<void> => {
     const connectionString = `${MONGODB_URI}${dbName}?retryWrites=true&w=majority`;
 
     console.log("[Database] Connecting to MongoDB...");
-    await mongoose.connect(connectionString);
+    console.log(`[Database] Connection string: ${MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, "//***:***@")}${dbName}`);
+    
+    await mongoose.connect(connectionString, {
+      serverSelectionTimeoutMS: 10000, // 10 seconds timeout
+      socketTimeoutMS: 45000, // 45 seconds socket timeout
+      connectTimeoutMS: 10000, // 10 seconds connection timeout
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+      minPoolSize: 1, // Maintain at least 1 socket connection
+    });
 
     isConnected = true;
     console.log("[Database] ✅ Successfully connected to MongoDB");
-  } catch (error) {
-    console.error("[Database] ❌ Failed to connect to MongoDB:", error);
+    console.log(`[Database] Database name: ${dbName}`);
+    console.log(`[Database] Connection state: ${mongoose.connection.readyState === 1 ? "Connected" : "Disconnected"}`);
+  } catch (error: any) {
+    console.error("[Database] ❌ Failed to connect to MongoDB");
+    
+    // Check for specific error types and provide helpful messages
+    if (error.name === "MongooseServerSelectionError" || error.name === "MongoServerSelectionError") {
+      console.error("[Database] Server Selection Error - This usually means:");
+      console.error("  1. Your IP address is not whitelisted in MongoDB Atlas");
+      console.error("  2. Network connectivity issues");
+      console.error("  3. MongoDB Atlas cluster is down or unreachable");
+      console.error("");
+      console.error("To fix IP whitelist issue:");
+      console.error("  1. Go to MongoDB Atlas Dashboard: https://cloud.mongodb.com/");
+      console.error("  2. Navigate to: Network Access → IP Access List");
+      console.error("  3. Click 'Add IP Address'");
+      console.error("  4. Click 'Add Current IP Address' or add '0.0.0.0/0' to allow all IPs (less secure)");
+      console.error("  5. Wait a few minutes for changes to propagate");
+      console.error("");
+      console.error("Full error details:", error.message);
+    } else if (error.name === "MongoNetworkError" || error.name === "MongooseError") {
+      console.error("[Database] Network Error - Check your internet connection and MongoDB Atlas status");
+      console.error("Full error details:", error.message);
+    } else {
+      console.error("[Database] Connection Error:", error.message);
+      if (error.stack) {
+        console.error("[Database] Stack trace:", error.stack);
+      }
+    }
+    
     isConnected = false;
     throw error;
   }
