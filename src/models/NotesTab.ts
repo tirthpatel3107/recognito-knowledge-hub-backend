@@ -34,6 +34,9 @@ const NotesTabSchema = new Schema<INotesTab>(
       type: Number,
       required: true,
       default: 0,
+      min: 0, // Order must be non-negative
+      // Note: Order values are assigned separately for pinned (0,1,2...) and unpinned (0,1,2...) tabs
+      // The backend sorts by: pinned (desc), order (asc), createdAt (asc)
     },
     deletedAt: {
       type: Date,
@@ -47,6 +50,12 @@ const NotesTabSchema = new Schema<INotesTab>(
 
 // Compound index - userId and name should be unique together
 NotesTabSchema.index({ userId: 1, name: 1 }, { unique: true });
+
+// Index for efficient sorting: pinned (desc), order (asc), createdAt (asc)
+// This matches the sort order used in getTabs: { pinned: -1, order: 1, createdAt: 1 }
+NotesTabSchema.index({ userId: 1, pinned: -1, order: 1, createdAt: 1 });
+
+// Index for order-based queries (backward compatibility and migration)
 NotesTabSchema.index({ userId: 1, order: 1 });
 
 export const NotesTab = mongoose.model<INotesTab>("NotesTab", NotesTabSchema);

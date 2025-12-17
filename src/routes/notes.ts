@@ -71,6 +71,9 @@ router.delete("/tabs/:tabId", authenticateToken, notesController.deleteTabHandle
 // Reorder tabs
 router.post("/tabs/reorder", authenticateToken, notesController.reorderTabsHandler);
 
+// Reorder notes
+router.post("/reorder", authenticateToken, notesController.reorderNotesHandler);
+
 // Toggle tab pin status
 router.put("/tabs/:tabId/pin", authenticateToken, notesController.toggleTabPinHandler);
 

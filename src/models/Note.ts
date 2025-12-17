@@ -11,12 +11,14 @@ export interface INote extends Document {
   description2?: string;
   description3?: string;
   starred?: boolean;
+  order?: number; // Sequence/order field for tracking note order within a tab
+  allOrder?: number; // Sequence/order field for tracking note order in "All" view
+  starredOrder?: number; // Sequence/order field for tracking note order in "Starred" view
   // Legacy fields for backward compatibility
   columnIndex?: number;
   columnLetter?: string;
   heading?: string;
   content?: string;
-  imageUrls?: string[];
   rowIndex?: number;
   deletedAt?: Date;
   createdAt: Date;
@@ -58,6 +60,24 @@ const NoteSchema = new Schema<INote>(
       type: Boolean,
       default: false,
     },
+    order: {
+      type: Number,
+      default: 0,
+      min: 0, // Order must be non-negative
+      // Used to track the sequence/order of notes within a tab
+    },
+    allOrder: {
+      type: Number,
+      default: 0,
+      min: 0, // Order must be non-negative
+      // Used to track the sequence/order of notes in "All" view
+    },
+    starredOrder: {
+      type: Number,
+      default: 0,
+      min: 0, // Order must be non-negative
+      // Used to track the sequence/order of notes in "Starred" view
+    },
     // Legacy fields
     columnIndex: {
       type: Number,
@@ -70,10 +90,6 @@ const NoteSchema = new Schema<INote>(
     },
     content: {
       type: String,
-    },
-    imageUrls: {
-      type: [String],
-      default: [],
     },
     rowIndex: {
       type: Number,
@@ -90,6 +106,9 @@ const NoteSchema = new Schema<INote>(
 
 // Compound index for efficient queries
 NoteSchema.index({ userId: 1, tabId: 1 });
+
+// Index for efficient sorting by order within a tab
+NoteSchema.index({ userId: 1, tabId: 1, order: 1, createdAt: 1 });
 
 export const Note = mongoose.model<INote>("Note", NoteSchema);
 

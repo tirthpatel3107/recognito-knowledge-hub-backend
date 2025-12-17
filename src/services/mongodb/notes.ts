@@ -1,6 +1,7 @@
 /**
  * MongoDB Notes Service
  */
+import mongoose from "mongoose";
 import { Note } from "../../models/Note.js";
 import { NotesTab } from "../../models/NotesTab.js";
 
@@ -9,6 +10,7 @@ export interface NotesTabResult {
   name: string;
   sheetId?: number;
   pinned?: boolean;
+  order?: number;
 }
 
 export interface NoteResult {
@@ -17,7 +19,6 @@ export interface NoteResult {
   columnLetter: string;
   heading: string;
   content: string;
-  imageUrls?: string[];
   rowIndex: number;
   tabId?: string;
   title?: string;
@@ -25,46 +26,139 @@ export interface NoteResult {
   description2?: string;
   description3?: string;
   starred?: boolean;
+  order?: number; // Sequence/order field for tracking note order within a tab
+  allOrder?: number; // Sequence/order field for tracking note order in "All" view
+  starredOrder?: number; // Sequence/order field for tracking note order in "Starred" view
 }
 
 /**
  * Get all tabs for a specific user
+ * Also ensures all tabs have order values set (migration for existing tabs)
  */
 export const getTabs = async (
   userId: string,
 ): Promise<NotesTabResult[]> => {
   // Return tabs from this user only
-  const tabs = await NotesTab.find({ 
+  let tabs = await NotesTab.find({ 
     userId,
     deletedAt: null,
   }).sort({
     pinned: -1,
     order: 1,
+    createdAt: 1, // Secondary sort for stability when order values are the same
   });
+
+  // Migration: Ensure all tabs have order values
+  // Separate pinned and unpinned tabs
+  const pinnedTabs = tabs.filter((tab) => tab.pinned);
+  const unpinnedTabs = tabs.filter((tab) => !tab.pinned);
+  
+  // Check if any tabs are missing order values
+  const needsMigration = tabs.some((tab) => tab.order === undefined || tab.order === null);
+  
+  if (needsMigration) {
+    // Update order for pinned tabs (0, 1, 2...)
+    const pinnedUpdates = pinnedTabs.map((tab, index) => {
+      if (tab.order === undefined || tab.order === null) {
+        return NotesTab.findByIdAndUpdate(tab._id, { order: index }, { new: true });
+      }
+      return Promise.resolve(tab);
+    });
+    
+    // Update order for unpinned tabs (0, 1, 2...)
+    const unpinnedUpdates = unpinnedTabs.map((tab, index) => {
+      if (tab.order === undefined || tab.order === null) {
+        return NotesTab.findByIdAndUpdate(tab._id, { order: index }, { new: true });
+      }
+      return Promise.resolve(tab);
+    });
+    
+    await Promise.all([...pinnedUpdates, ...unpinnedUpdates]);
+    
+    // Reload tabs after migration
+    tabs = await NotesTab.find({ 
+      userId,
+      deletedAt: null,
+    }).sort({
+      pinned: -1,
+      order: 1,
+      createdAt: 1,
+    });
+  }
 
   return tabs.map((tab, index) => ({
     id: tab._id.toString(),
     name: tab.name,
     sheetId: index, // For backward compatibility
     pinned: tab.pinned,
+    order: tab.order ?? index, // Include order field for frontend sorting
   }));
 };
 
 /**
  * Get all notes from "All Notes" for a specific user
+ * Sorted by: tab order (pinned first, then order), then note order within tab, then createdAt
  */
 export const getAllNotes = async (
   userId: string,
 ): Promise<NoteResult[]> => {
-  // Return notes from this user only
-  const notes = await Note.find({ 
+  // Get all tabs with their order for sorting
+  const tabs = await NotesTab.find({
     userId,
     deletedAt: null,
   }).sort({
+    pinned: -1,
+    order: 1,
     createdAt: 1,
   });
 
-  return notes.map((note, index) => ({
+  // Create a map of tabId to tab order for efficient lookup
+  const tabOrderMap = new Map<string, { order: number; pinned: boolean }>();
+  tabs.forEach((tab, index) => {
+    tabOrderMap.set(tab._id.toString(), {
+      order: tab.order ?? index,
+      pinned: tab.pinned ?? false,
+    });
+  });
+
+  // Get all notes from this user
+  const notes = await Note.find({
+    userId,
+    deletedAt: null,
+  });
+
+  // Sort notes: first by tab order (pinned tabs first), then by allOrder, then by createdAt
+  const sortedNotes = notes.sort((a, b) => {
+    const tabA = tabOrderMap.get(a.tabId);
+    const tabB = tabOrderMap.get(b.tabId);
+
+    // If tab info not found, put at end
+    if (!tabA && !tabB) return a.createdAt.getTime() - b.createdAt.getTime();
+    if (!tabA) return 1;
+    if (!tabB) return -1;
+
+    // First sort by pinned status (pinned tabs first)
+    if (tabA.pinned !== tabB.pinned) {
+      return tabA.pinned ? -1 : 1;
+    }
+
+    // Then sort by tab order
+    if (tabA.order !== tabB.order) {
+      return tabA.order - tabB.order;
+    }
+
+    // Then sort by allOrder (order in "All" view)
+    const allOrderA = a.allOrder ?? 0;
+    const allOrderB = b.allOrder ?? 0;
+    if (allOrderA !== allOrderB) {
+      return allOrderA - allOrderB;
+    }
+
+    // Finally sort by createdAt as fallback
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+
+  return sortedNotes.map((note, index) => ({
     id: note._id.toString(),
     tabId: note.tabId,
     title: note.title || "",
@@ -76,8 +170,10 @@ export const getAllNotes = async (
     columnLetter: note.columnLetter || "A",
     heading: note.heading || note.title || "",
     content: note.content || note.description || "",
-    imageUrls: note.imageUrls,
     rowIndex: note.rowIndex ?? index,
+    order: note.order ?? 0,
+    allOrder: note.allOrder ?? 0,
+    starredOrder: note.starredOrder ?? 0,
   }));
 };
 
@@ -100,11 +196,15 @@ export const getNotesByTab = async (
   }
 
   // Return notes from this user for this tab only
+  // Sort by: note order first, then createdAt as fallback
   const notes = await Note.find({
     userId,
     tabId: tab._id.toString(),
     deletedAt: null,
-  }).sort({ createdAt: 1 });
+  }).sort({
+    order: 1,
+    createdAt: 1,
+  });
 
   return notes.map((note, index) => ({
     id: note._id.toString(),
@@ -118,8 +218,10 @@ export const getNotesByTab = async (
     columnLetter: note.columnLetter || "A",
     heading: note.heading || note.title || "",
     content: note.content || note.description || "",
-    imageUrls: note.imageUrls,
     rowIndex: note.rowIndex ?? index,
+    order: note.order ?? 0,
+    allOrder: note.allOrder ?? 0,
+    starredOrder: note.starredOrder ?? 0,
   }));
 };
 
@@ -222,9 +324,15 @@ export const updateNoteInAllNotes = async (
   userId: string,
 ): Promise<boolean> => {
   try {
+    // If unstarring (starred is explicitly false), reset starredOrder to 0
+    const updateData: any = { ...noteData };
+    if (noteData.starred === false) {
+      updateData.starredOrder = 0;
+    }
+
     await Note.findOneAndUpdate(
       { _id: noteId, userId, deletedAt: null },
-      noteData,
+      updateData,
     );
     return true;
   } catch (error) {
@@ -383,25 +491,141 @@ export const deleteTab = async (
 
 /**
  * Reorder tabs
+ * Assigns order values separately for pinned and unpinned tabs
+ * since backend sorts by pinned first, then order
  */
 export const reorderTabs = async (
   tabIds: string[],
   userId: string,
 ): Promise<boolean> => {
   try {
-    // Update order for each tab
-    const updatePromises = tabIds.map((tabId, index) => {
-      return NotesTab.findOneAndUpdate(
+    // First, fetch all tabs to get their pinned status
+    const allTabs = await NotesTab.find({
+      _id: { $in: tabIds },
+      userId,
+      deletedAt: null,
+    });
+
+    // Create a map of tabId to tab for quick lookup
+    const tabMap = new Map(
+      allTabs.map((tab) => [tab._id.toString(), tab])
+    );
+
+    // Separate tabs into pinned and unpinned based on the order in tabIds
+    const pinnedTabs: string[] = [];
+    const unpinnedTabs: string[] = [];
+
+    for (const tabId of tabIds) {
+      const tab = tabMap.get(tabId);
+      if (tab?.pinned) {
+        pinnedTabs.push(tabId);
+      } else {
+        unpinnedTabs.push(tabId);
+      }
+    }
+
+    // Update order for pinned tabs (0, 1, 2...)
+    const pinnedPromises = pinnedTabs.map((tabId, index) => {
+      return NotesTab.updateOne(
         { _id: tabId, userId, deletedAt: null },
-        { order: index },
+        { $set: { order: index } },
+        { runValidators: true },
       );
     });
-    
-    await Promise.all(updatePromises);
+
+    // Update order for unpinned tabs (0, 1, 2...)
+    const unpinnedPromises = unpinnedTabs.map((tabId, index) => {
+      return NotesTab.updateOne(
+        { _id: tabId, userId, deletedAt: null },
+        { $set: { order: index } },
+        { runValidators: true },
+      );
+    });
+
+    await Promise.all([...pinnedPromises, ...unpinnedPromises]);
     
     return true;
   } catch (error) {
     console.error("Error reordering tabs:", error);
+    return false;
+  }
+};
+
+/**
+ * Reorder notes
+ * Updates the appropriate order field based on viewType:
+ * - "tab": Updates order field (per-tab ordering)
+ * - "all": Updates allOrder field (global ordering in "All" view)
+ * - "starred": Updates starredOrder field (ordering in "Starred" view)
+ */
+export const reorderNotes = async (
+  noteIds: string[],
+  userId: string,
+  viewType: "tab" | "all" | "starred" = "tab",
+): Promise<boolean> => {
+  try {
+    if (!noteIds || noteIds.length === 0) {
+      console.error("reorderNotes: noteIds array is empty or invalid");
+      return false;
+    }
+
+    // Convert userId to ObjectId for proper querying
+    const userIdObjectId = new mongoose.Types.ObjectId(userId);
+
+    // Determine which order field to update based on viewType
+    // Each view type has its own order field that should be updated independently
+    let orderField: "order" | "allOrder" | "starredOrder" = "order";
+    if (viewType === "all") {
+      orderField = "allOrder";
+    } else if (viewType === "starred") {
+      orderField = "starredOrder";
+    }
+
+    console.log(`reorderNotes: Updating ${orderField} for ${noteIds.length} notes, viewType: ${viewType}, userId: ${userId}`);
+
+    // Validate noteIds are valid ObjectIds
+    const validNoteIds = noteIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (validNoteIds.length !== noteIds.length) {
+      console.error(`reorderNotes: Some noteIds are invalid. Valid: ${validNoteIds.length}/${noteIds.length}`);
+      return false;
+    }
+
+    // Use bulkWrite for atomic updates
+    const bulkOps = noteIds.map((noteId, index) => {
+      return {
+        updateOne: {
+          filter: {
+            _id: new mongoose.Types.ObjectId(noteId),
+            userId: userIdObjectId,
+            deletedAt: null as any,
+          },
+          update: {
+            $set: { [orderField]: index },
+          },
+        },
+      } as any;
+    });
+
+    const result = await Note.bulkWrite(bulkOps, { ordered: false });
+
+    const totalMatched = result.matchedCount;
+    const totalModified = result.modifiedCount;
+
+    console.log(`reorderNotes (${viewType}): Matched ${totalMatched}/${noteIds.length}, Modified ${totalModified}/${noteIds.length}`);
+
+    if (totalMatched !== noteIds.length) {
+      console.error(`reorderNotes (${viewType}): Some notes were not found. Expected ${noteIds.length}, matched ${totalMatched}`);
+      return false;
+    }
+
+    if (totalModified !== noteIds.length) {
+      console.warn(`reorderNotes (${viewType}): Some notes were not modified (may already have correct order). Expected ${noteIds.length}, modified ${totalModified}`);
+      // Still return true if matched, as the order might already be correct
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error reordering notes:", error);
     return false;
   }
 };

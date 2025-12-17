@@ -23,6 +23,7 @@ import {
   updateTab,
   deleteTab,
   reorderTabs,
+  reorderNotes,
   toggleTabPin,
 } from "../services/mongodb/notes";
 
@@ -389,6 +390,33 @@ export const reorderTabsHandler = asyncHandler(async (req: Request, res: Respons
     }
   } catch (error: any) {
     return sendError(res, error?.message || "Failed to reorder tabs", 500);
+  }
+});
+
+/**
+ * Reorder notes
+ */
+export const reorderNotesHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { noteIds, viewType } = req.body;
+
+  if (!Array.isArray(noteIds)) {
+    return sendValidationError(res, "noteIds must be an array");
+  }
+
+  // Validate viewType if provided
+  const validViewType = viewType === "all" || viewType === "starred" ? viewType : "tab";
+
+  try {
+    const userId = req.user!.userId;
+    const success = await reorderNotes(noteIds, userId, validViewType);
+
+    if (success) {
+      return sendSuccess(res, null, "Notes reordered successfully");
+    } else {
+      return sendError(res, "Failed to reorder notes", 500);
+    }
+  } catch (error: any) {
+    return sendError(res, error?.message || "Failed to reorder notes", 500);
   }
 });
 
