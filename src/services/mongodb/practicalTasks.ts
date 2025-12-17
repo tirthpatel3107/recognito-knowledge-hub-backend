@@ -146,9 +146,60 @@ export const deletePracticalTask = async (
 };
 
 /**
- * Reorder practical tasks
+ * Reorder practical tasks by oldIndex/newIndex
  */
 export const reorderPracticalTasks = async (
+  technologyName: string,
+  oldIndex: number,
+  newIndex: number,
+): Promise<boolean> => {
+  try {
+    // Get all tasks for this technology, sorted by current order
+    const tasks = await PracticalTask.find({
+      technologyName,
+      deletedAt: null,
+    }).sort({ order: 1 });
+
+    if (tasks.length === 0) {
+      return true; // Nothing to reorder
+    }
+
+    // Validate indices
+    if (
+      oldIndex < 0 ||
+      oldIndex >= tasks.length ||
+      newIndex < 0 ||
+      newIndex >= tasks.length
+    ) {
+      throw new Error(
+        `Invalid indices: oldIndex=${oldIndex}, newIndex=${newIndex}, totalTasks=${tasks.length}`,
+      );
+    }
+
+    // Reorder the array
+    const [movedTask] = tasks.splice(oldIndex, 1);
+    tasks.splice(newIndex, 0, movedTask);
+
+    // Update order for all tasks
+    const updates = tasks.map((task, index) =>
+      PracticalTask.findOneAndUpdate(
+        { _id: task._id, technologyName, deletedAt: null },
+        { order: index },
+      ),
+    );
+
+    await Promise.all(updates);
+    return true;
+  } catch (error) {
+    console.error("Error reordering practical tasks:", error);
+    return false;
+  }
+};
+
+/**
+ * Reorder practical tasks by array of IDs (backward compatibility)
+ */
+export const reorderPracticalTasksByIds = async (
   technologyName: string,
   taskIds: string[],
 ): Promise<boolean> => {
@@ -162,7 +213,7 @@ export const reorderPracticalTasks = async (
     await Promise.all(updates);
     return true;
   } catch (error) {
-    console.error("Error reordering practical tasks:", error);
+    console.error("Error reordering practical tasks by IDs:", error);
     return false;
   }
 };

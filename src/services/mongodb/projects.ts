@@ -117,9 +117,59 @@ export const deleteProject = async (projectId: string, userId: string): Promise<
 };
 
 /**
- * Reorder projects for a specific user
+ * Reorder projects by oldIndex/newIndex for a specific user
  */
 export const reorderProjects = async (
+  userId: string,
+  oldIndex: number,
+  newIndex: number,
+): Promise<boolean> => {
+  try {
+    // Get all projects for this user, sorted by current order
+    const projects = await Project.find({ userId, deletedAt: null }).sort({
+      order: 1,
+    });
+
+    if (projects.length === 0) {
+      return true; // Nothing to reorder
+    }
+
+    // Validate indices
+    if (
+      oldIndex < 0 ||
+      oldIndex >= projects.length ||
+      newIndex < 0 ||
+      newIndex >= projects.length
+    ) {
+      throw new Error(
+        `Invalid indices: oldIndex=${oldIndex}, newIndex=${newIndex}, totalProjects=${projects.length}`,
+      );
+    }
+
+    // Reorder the array
+    const [movedProject] = projects.splice(oldIndex, 1);
+    projects.splice(newIndex, 0, movedProject);
+
+    // Update order for all projects
+    const updates = projects.map((project, index) =>
+      Project.findOneAndUpdate(
+        { _id: project._id, userId, deletedAt: null },
+        { order: index },
+      ),
+    );
+
+    await Promise.all(updates);
+    return true;
+  } catch (error) {
+    console.error("Error reordering projects:", error);
+    return false;
+  }
+};
+
+/**
+ * Reorder projects by array of IDs (backward compatibility)
+ */
+export const reorderProjectsByIds = async (
   projectIds: string[],
   userId: string,
 ): Promise<boolean> => {
@@ -133,7 +183,7 @@ export const reorderProjects = async (
     await Promise.all(updates);
     return true;
   } catch (error) {
-    console.error("Error reordering projects:", error);
+    console.error("Error reordering projects by IDs:", error);
     return false;
   }
 };

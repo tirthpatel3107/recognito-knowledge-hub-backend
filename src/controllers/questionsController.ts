@@ -9,6 +9,7 @@ import {
   updateQuestion,
   deleteQuestion,
   reorderQuestions,
+  reorderQuestionsByIds,
 } from "../services/mongodb/questions";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
@@ -122,18 +123,43 @@ export const deleteQuestionHandler = asyncHandler(
 export const reorderQuestionsHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const { technologyName } = req.params;
-    const { questionIds } = req.body;
+    const { oldIndex, newIndex, questionIds } = req.body;
 
-    if (!Array.isArray(questionIds)) {
-      return sendValidationError(res, "questionIds must be an array");
-    }
+    // Support both formats: { oldIndex, newIndex } or { questionIds: [] }
+    if (oldIndex !== undefined && newIndex !== undefined) {
+      // Handle oldIndex/newIndex format
+      if (typeof oldIndex !== "number" || typeof newIndex !== "number") {
+        return sendValidationError(
+          res,
+          "oldIndex and newIndex must be numbers",
+        );
+      }
 
-    const success = await reorderQuestions(technologyName, questionIds);
+      const success = await reorderQuestions(
+        technologyName,
+        oldIndex,
+        newIndex,
+      );
 
-    if (success) {
-      return sendSuccess(res, null, "Questions reordered successfully");
+      if (success) {
+        return sendSuccess(res, null, "Questions reordered successfully");
+      } else {
+        return sendError(res, "Failed to reorder questions", 500);
+      }
+    } else if (Array.isArray(questionIds)) {
+      // Handle questionIds array format (backward compatibility)
+      const success = await reorderQuestionsByIds(technologyName, questionIds);
+
+      if (success) {
+        return sendSuccess(res, null, "Questions reordered successfully");
+      } else {
+        return sendError(res, "Failed to reorder questions", 500);
+      }
     } else {
-      return sendError(res, "Failed to reorder questions", 500);
+      return sendValidationError(
+        res,
+        "Either oldIndex/newIndex or questionIds array is required",
+      );
     }
   },
 );

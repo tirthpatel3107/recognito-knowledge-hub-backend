@@ -9,6 +9,7 @@ import {
   updatePracticalTask,
   deletePracticalTask,
   reorderPracticalTasks,
+  reorderPracticalTasksByIds,
 } from "../services/mongodb/practicalTasks";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
@@ -154,18 +155,46 @@ export const deletePracticalTaskHandler = asyncHandler(
 export const reorderPracticalTasksHandler = asyncHandler(
   async (req: Request, res: Response) => {
     const { technologyName } = req.params;
-    const { taskIds } = req.body;
+    const { oldIndex, newIndex, taskIds } = req.body;
 
-    if (!Array.isArray(taskIds)) {
-      return sendValidationError(res, "taskIds must be an array");
-    }
+    // Support both formats: { oldIndex, newIndex } or { taskIds: [] }
+    if (oldIndex !== undefined && newIndex !== undefined) {
+      // Handle oldIndex/newIndex format
+      if (typeof oldIndex !== "number" || typeof newIndex !== "number") {
+        return sendValidationError(
+          res,
+          "oldIndex and newIndex must be numbers",
+        );
+      }
 
-    const success = await reorderPracticalTasks(technologyName, taskIds);
+      const success = await reorderPracticalTasks(
+        technologyName,
+        oldIndex,
+        newIndex,
+      );
 
-    if (success) {
-      return sendSuccess(res, null, "Practical tasks reordered successfully");
+      if (success) {
+        return sendSuccess(res, null, "Practical tasks reordered successfully");
+      } else {
+        return sendError(res, "Failed to reorder practical tasks", 500);
+      }
+    } else if (Array.isArray(taskIds)) {
+      // Handle taskIds array format (backward compatibility)
+      const success = await reorderPracticalTasksByIds(
+        technologyName,
+        taskIds,
+      );
+
+      if (success) {
+        return sendSuccess(res, null, "Practical tasks reordered successfully");
+      } else {
+        return sendError(res, "Failed to reorder practical tasks", 500);
+      }
     } else {
-      return sendError(res, "Failed to reorder practical tasks", 500);
+      return sendValidationError(
+        res,
+        "Either oldIndex/newIndex or taskIds array is required",
+      );
     }
   },
 );

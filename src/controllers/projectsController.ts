@@ -9,6 +9,7 @@ import {
   updateProject,
   deleteProject,
   reorderProjects,
+  reorderProjectsByIds,
 } from "../services/mongodb/projects";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
@@ -128,19 +129,41 @@ export const deleteProjectHandler = asyncHandler(
  */
 export const reorderProjectsHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    const { projectIds } = req.body;
-
-    if (!Array.isArray(projectIds)) {
-      return sendValidationError(res, "projectIds must be an array");
-    }
+    const { oldIndex, newIndex, projectIds } = req.body;
 
     const userId = req.user!.userId;
-    const success = await reorderProjects(projectIds, userId);
 
-    if (success) {
-      return sendSuccess(res, null, "Projects reordered successfully");
+    // Support both formats: { oldIndex, newIndex } or { projectIds: [] }
+    if (oldIndex !== undefined && newIndex !== undefined) {
+      // Handle oldIndex/newIndex format
+      if (typeof oldIndex !== "number" || typeof newIndex !== "number") {
+        return sendValidationError(
+          res,
+          "oldIndex and newIndex must be numbers",
+        );
+      }
+
+      const success = await reorderProjects(userId, oldIndex, newIndex);
+
+      if (success) {
+        return sendSuccess(res, null, "Projects reordered successfully");
+      } else {
+        return sendError(res, "Failed to reorder projects", 500);
+      }
+    } else if (Array.isArray(projectIds)) {
+      // Handle projectIds array format (backward compatibility)
+      const success = await reorderProjectsByIds(projectIds, userId);
+
+      if (success) {
+        return sendSuccess(res, null, "Projects reordered successfully");
+      } else {
+        return sendError(res, "Failed to reorder projects", 500);
+      }
     } else {
-      return sendError(res, "Failed to reorder projects", 500);
+      return sendValidationError(
+        res,
+        "Either oldIndex/newIndex or projectIds array is required",
+      );
     }
   },
 );

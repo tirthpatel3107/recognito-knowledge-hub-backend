@@ -82,22 +82,51 @@ export const deleteTechnology = async (
 
 /**
  * Reorder technologies
+ * @param technologyIds - Array of sheetId (indices) in the new order, or MongoDB _id strings
  */
 export const reorderTechnologies = async (
-  technologyIds: string[],
+  technologyIds: (string | number)[],
 ): Promise<boolean> => {
-  try {
-    const updates = technologyIds.map((id, index) =>
+  // Get all technologies sorted by current order
+  const allTechnologies = await Technology.find({ deletedAt: null }).sort({ order: 1 });
+  
+  if (allTechnologies.length === 0) {
+    throw new Error("No technologies found to reorder");
+  }
+  
+  // If the first ID is a number, treat them as sheetId (indices)
+  // Otherwise, treat them as MongoDB _id strings
+  const isUsingSheetIds = typeof technologyIds[0] === 'number';
+  
+  let updates: Promise<any>[];
+  
+  if (isUsingSheetIds) {
+    // Map sheetId (indices) to MongoDB _id values
+    const mongoIds = (technologyIds as number[]).map((sheetId) => {
+      if (sheetId < 0 || sheetId >= allTechnologies.length) {
+        throw new Error(`Invalid sheetId: ${sheetId}. Must be between 0 and ${allTechnologies.length - 1}`);
+      }
+      return allTechnologies[sheetId]._id.toString();
+    });
+    
+    // Update order based on new positions
+    updates = mongoIds.map((id, index) =>
       Technology.findOneAndUpdate(
         { _id: id, deletedAt: null },
         { order: index },
       ),
     );
-    await Promise.all(updates);
-    return true;
-  } catch (error) {
-    console.error("Error reordering technologies:", error);
-    return false;
+  } else {
+    // Treat as MongoDB _id strings directly
+    updates = (technologyIds as string[]).map((id, index) =>
+      Technology.findOneAndUpdate(
+        { _id: id, deletedAt: null },
+        { order: index },
+      ),
+    );
   }
+  
+  await Promise.all(updates);
+  return true;
 };
 

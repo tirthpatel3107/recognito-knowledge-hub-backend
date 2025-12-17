@@ -93,6 +93,10 @@ export const reorderPracticalTaskTechnologiesHandler = asyncHandler(
       return sendValidationError(res, "technologyIds must be an array");
     }
 
+    if (technologyIds.length === 0) {
+      return sendValidationError(res, "technologyIds array cannot be empty");
+    }
+
     const success = await reorderTechnologies(technologyIds);
 
     if (success) {

@@ -135,9 +135,60 @@ export const deleteQuestion = async (
 };
 
 /**
- * Reorder questions
+ * Reorder questions by oldIndex/newIndex
  */
 export const reorderQuestions = async (
+  technologyName: string,
+  oldIndex: number,
+  newIndex: number,
+): Promise<boolean> => {
+  try {
+    // Get all questions for this technology, sorted by current order
+    const questions = await Question.find({
+      technologyName,
+      deletedAt: null,
+    }).sort({ order: 1 });
+
+    if (questions.length === 0) {
+      return true; // Nothing to reorder
+    }
+
+    // Validate indices
+    if (
+      oldIndex < 0 ||
+      oldIndex >= questions.length ||
+      newIndex < 0 ||
+      newIndex >= questions.length
+    ) {
+      throw new Error(
+        `Invalid indices: oldIndex=${oldIndex}, newIndex=${newIndex}, totalQuestions=${questions.length}`,
+      );
+    }
+
+    // Reorder the array
+    const [movedQuestion] = questions.splice(oldIndex, 1);
+    questions.splice(newIndex, 0, movedQuestion);
+
+    // Update order for all questions
+    const updates = questions.map((question, index) =>
+      Question.findOneAndUpdate(
+        { _id: question._id, technologyName, deletedAt: null },
+        { order: index },
+      ),
+    );
+
+    await Promise.all(updates);
+    return true;
+  } catch (error) {
+    console.error("Error reordering questions:", error);
+    return false;
+  }
+};
+
+/**
+ * Reorder questions by array of IDs (backward compatibility)
+ */
+export const reorderQuestionsByIds = async (
   technologyName: string,
   questionIds: string[],
 ): Promise<boolean> => {
@@ -151,7 +202,7 @@ export const reorderQuestions = async (
     await Promise.all(updates);
     return true;
   } catch (error) {
-    console.error("Error reordering questions:", error);
+    console.error("Error reordering questions by IDs:", error);
     return false;
   }
 };
