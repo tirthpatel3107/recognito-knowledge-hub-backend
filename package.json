@@ -11,7 +11,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "prettier": "prettier --write \"src/**/*.{ts,js}\"",
     "prettier:check": "prettier --check \"src/**/*.{ts,js}\"",
-    "seed:demo": "tsx scripts/seedDemo.ts"
+    "seed:demo": "tsx scripts/seedDemo.ts",
+    "remove:soft-deleted": "tsx scripts/removeSoftDeleted.ts"
   },
   "keywords": [],
   "author": "",
