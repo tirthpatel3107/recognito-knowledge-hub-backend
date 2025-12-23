@@ -38,6 +38,7 @@ export const updateDashboardOrder = async (
       "practical-task",
       "kanban-board",
       "notes",
+      "attendance",
     ];
     
     // Filter to only include valid module IDs

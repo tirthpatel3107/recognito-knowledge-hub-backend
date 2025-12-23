@@ -59,4 +59,11 @@ router.get(
   userController.getUserSpreadsheetIdsHandler,
 );
 
+// Get users for attendance selection
+router.get(
+  "/attendance-users",
+  authenticateToken,
+  userController.getUsersForAttendanceHandler,
+);
+
 export default router;

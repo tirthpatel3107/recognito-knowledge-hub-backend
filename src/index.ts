@@ -29,6 +29,8 @@ import userRoutes from "./routes/user.js";
 import tagsRoutes from "./routes/tags.js";
 import kanbanRoutes from "./routes/kanban.js";
 import notesRoutes from "./routes/notes.js";
+import entityRoutes from "./routes/entity.js";
+import attendanceRoutes from "./routes/attendance.js";
 
 // Import database connection
 import { connectDatabase } from "./config/database.js";
@@ -117,6 +119,8 @@ app.use("/api/user", userRoutes);
 app.use("/api/tags", tagsRoutes);
 app.use("/api/kanban", kanbanRoutes);
 app.use("/api/notes", notesRoutes);
+app.use("/api/entities", entityRoutes);
+app.use("/api/attendance", attendanceRoutes);
 console.log(`[Backend] All API routes registered successfully`);
 
 // 404 handler

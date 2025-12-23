@@ -11,6 +11,8 @@ import {
   updateUserPhoto,
 } from "../services/mongodb/userProfile";
 import { User } from "../models/User.js";
+import { Attendance } from "../models/Attendance.js";
+import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { asyncHandler } from "../utils/asyncHandler";
 import {
@@ -215,5 +217,51 @@ export const getUserSpreadsheetIdsHandler = asyncHandler(
   async (req: Request, res: Response) => {
     // Return empty object since we no longer use Google Sheets
     return sendSuccess(res, {});
+  },
+);
+
+/**
+ * Get list of users (for attendance user selection)
+ * Returns users that the current user has created attendance records for,
+ * plus the current user themselves
+ */
+export const getUsersForAttendanceHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    try {
+      const currentUserId = req.user!.userId;
+
+      // Get distinct targetUserIds for attendance records created by this user
+      const distinctTargetUsers = await Attendance.distinct("targetUserId", {
+        userId: currentUserId,
+        deletedAt: null,
+      });
+
+      // Always include the current user
+      const allTargetUserIds = [
+        new mongoose.Types.ObjectId(currentUserId),
+        ...distinctTargetUsers,
+      ];
+
+      // Get unique user IDs (remove duplicates)
+      const uniqueUserIds = [...new Set(allTargetUserIds.map((id) => id.toString()))];
+
+      // Get user details
+      const users = await User.find({
+        _id: { $in: uniqueUserIds.map((id) => new mongoose.Types.ObjectId(id)) },
+        deletedAt: null,
+      }).select("_id username email photo");
+
+      const userList = users.map((user) => ({
+        id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        photo: user.photo || "",
+      }));
+
+      return sendSuccess(res, userList);
+    } catch (error) {
+      console.error("Error getting users for attendance:", error);
+      return sendError(res, "Failed to get users", 500);
+    }
   },
 );
